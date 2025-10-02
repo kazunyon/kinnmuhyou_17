@@ -130,9 +130,9 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
           {/* 時間入力 */}
           <div className="space-y-2 p-4 border rounded">
               {renderTimePicker('startTime', '開始時間')}
-              <div className="flex items-center">
+              <div className="flex items-center justify-between">
                   {renderTimePicker('endTime', '終了時間')}
-                  <div className="flex items-center space-x-2 ml-10">
+                  <div className="flex items-center space-x-2">
                       <span>休憩時間</span>
                       <select
                           value={parseInt((times.breakTime || "00:00").split(':')[0]) * 60 + parseInt((times.breakTime || "00:00").split(':')[1])}
