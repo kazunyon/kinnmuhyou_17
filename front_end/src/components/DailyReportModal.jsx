@@ -129,25 +129,27 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
         {/* 時間入力 */}
         <div className="space-y-2 p-4 border rounded">
             {renderTimePicker('startTime', '開始時間')}
-            {renderTimePicker('endTime', '終了時間')}
-             <div className="flex items-center space-x-2">
-                <span className="w-20">休憩時間</span>
-                <select 
-                    value={parseInt((times.breakTime || "00:00").split(':')[0]) * 60 + parseInt((times.breakTime || "00:00").split(':')[1])}
-                    onChange={(e) => {
-                        const totalMinutes = parseInt(e.target.value);
-                        const h = Math.floor(totalMinutes / 60);
-                        const m = totalMinutes % 60;
-                        setTimes(prev => ({...prev, breakTime: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}))
-                    }}
-                    className="border rounded p-1">
-                    {breakMinuteOptions.map(opt => <option key={opt} value={opt}>{opt} 分</option>)}
-                </select>
-             </div>
+            <div className="flex items-center">
+                {renderTimePicker('endTime', '終了時間')}
+                <div className="flex items-center space-x-2 ml-10">
+                    <span>休憩時間</span>
+                    <select
+                        value={parseInt((times.breakTime || "00:00").split(':')[0]) * 60 + parseInt((times.breakTime || "00:00").split(':')[1])}
+                        onChange={(e) => {
+                            const totalMinutes = parseInt(e.target.value);
+                            const h = Math.floor(totalMinutes / 60);
+                            const m = totalMinutes % 60;
+                            setTimes(prev => ({...prev, breakTime: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}))
+                        }}
+                        className="border rounded p-1">
+                        {breakMinuteOptions.map(opt => <option key={opt} value={opt}>{opt} 分</option>)}
+                    </select>
+                </div>
+            </div>
         </div>
 
         {/* テキストエリア */}
-        <div className="space-y-4">
+        <div className="space-y-4 pl-[5.5rem]">
           <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
           <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
           <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
