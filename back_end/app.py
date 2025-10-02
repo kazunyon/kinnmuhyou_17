@@ -92,36 +92,27 @@ def get_companies():
 
 @app.route('/api/work_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_work_records(employee_id, year, month):
-    """指定された社員IDと年月の作業記録を取得する"""
+    """指定された社員IDと年月の作業記録と特記事項を取得する"""
     try:
         db = get_db()
-        query = """
-            SELECT 
-                CAST(strftime('%d', date) AS INTEGER) as day,
-                start_time,
-                end_time,
-                break_time,
-                work_content,
-                special_notes
-            FROM work_records
-            WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
-        """
-        # 年と月を2桁の文字列にフォーマット
         year_str = str(year)
         month_str = f"{month:02d}"
 
-        cursor = db.execute(query, (employee_id, year_str, month_str))
-        records = [dict(row) for row in cursor.fetchall()]
-        
-        # 1件しかない特記事項を取得
-        notes_cursor = db.execute("""
-            SELECT special_notes FROM work_records
+        # 日次記録を取得
+        records_cursor = db.execute("""
+            SELECT CAST(strftime('%d', date) AS INTEGER) as day, start_time, end_time, break_time, work_content
+            FROM work_records
             WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
-            AND special_notes IS NOT NULL AND special_notes != ''
-            LIMIT 1
         """, (employee_id, year_str, month_str))
-        special_notes_row = notes_cursor.fetchone()
-        special_notes = special_notes_row['special_notes'] if special_notes_row else ""
+        records = [dict(row) for row in records_cursor.fetchall()]
+
+        # 月次の特記事項を取得
+        notes_cursor = db.execute("""
+            SELECT special_notes FROM monthly_reports
+            WHERE employee_id = ? AND year = ? AND month = ?
+        """, (employee_id, year, month))
+        notes_row = notes_cursor.fetchone()
+        special_notes = notes_row['special_notes'] if notes_row else ""
 
         app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records)}件")
         return jsonify({"records": records, "special_notes": special_notes})
@@ -131,7 +122,7 @@ def get_work_records(employee_id, year, month):
 
 @app.route('/api/work_records', methods=['POST'])
 def save_work_records():
-    """作業記録を保存（更新または新規作成）する"""
+    """作業記録と特記事項を保存（更新または新規作成）する"""
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -143,53 +134,60 @@ def save_work_records():
         app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
+    db = get_db()
     try:
-        db = get_db()
-        cursor = db.cursor()
-        
-        # 月初の特記事項を更新
-        first_day_date_str = f"{year}-{month:02d}-01"
+        # 1. 特記事項の保存 (UPSERT)
+        cursor = db.execute(
+            "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
+            (employee_id, year, month)
+        )
+        report_row = cursor.fetchone()
+        if report_row:
+            db.execute(
+                "UPDATE monthly_reports SET special_notes = ? WHERE report_id = ?",
+                (special_notes, report_row['report_id'])
+            )
+        else:
+            db.execute(
+                "INSERT INTO monthly_reports (employee_id, year, month, special_notes) VALUES (?, ?, ?, ?)",
+                (employee_id, year, month, special_notes)
+            )
 
-        # まず、その月の特記事項を一旦すべてクリア
-        cursor.execute("""
-            UPDATE work_records
-            SET special_notes = NULL
-            WHERE employee_id = ? AND strftime('%Y-%m', date) = ?
-        """, (employee_id, f"{year}-{month:02d}"))
-        
+        # 2. 日次作業記録の保存 (UPSERT)
         for record in records:
             day = record.get('day')
             if day is None:
                 continue
+
             date_str = f"{year}-{month:02d}-{day:02d}"
             
-            # 該当日のレコードが存在するかチェック
-            cursor.execute("SELECT 1 FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date_str))
-            exists = cursor.fetchone()
+            cursor = db.execute(
+                "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
+                (employee_id, date_str)
+            )
+            record_row = cursor.fetchone()
 
-            current_special_notes = special_notes if int(day) == 1 else None
-
-            if exists:
+            if record_row:
                 # 更新
-                cursor.execute("""
+                db.execute("""
                     UPDATE work_records
-                    SET start_time = ?, end_time = ?, break_time = ?, work_content = ?, special_notes = ?
-                    WHERE employee_id = ? AND date = ?
+                    SET start_time = ?, end_time = ?, break_time = ?, work_content = ?
+                    WHERE record_id = ?
                 """, (
-                    record.get('start_time'), record.get('end_time'), record.get('break_time'), 
-                    record.get('work_content'), current_special_notes,
-                    employee_id, date_str
+                    record.get('start_time'), record.get('end_time'),
+                    record.get('break_time'), record.get('work_content'),
+                    record_row['record_id']
                 ))
             else:
                 # 新規作成
-                cursor.execute("""
-                    INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content, special_notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                db.execute("""
+                    INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     employee_id, date_str, record.get('start_time'), record.get('end_time'),
-                    record.get('break_time'), record.get('work_content'), current_special_notes
+                    record.get('break_time'), record.get('work_content')
                 ))
-        
+
         db.commit()
         app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
         return jsonify({"message": "保存しました"}), 200
