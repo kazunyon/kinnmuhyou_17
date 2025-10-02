@@ -149,7 +149,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
         </div>
 
         {/* テキストエリア */}
-        <div className="space-y-4 pl-[5.5rem]">
+        <div className="space-y-4 pl-4">
           <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
           <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
           <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
