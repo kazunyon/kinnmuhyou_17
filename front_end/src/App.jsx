@@ -10,7 +10,7 @@ import PrintLayout from './components/PrintLayout';
 import { useReactToPrint } from 'react-to-print';
 
 // APIのベースURL
-const API_URL = 'http://127.0.0.1:5000/api';
+const API_URL = 'http://localhost:5000/api';
 
 function App() {
   // --- State定義 ---
@@ -109,7 +109,7 @@ function App() {
         year,
         month,
         records: workRecords.filter(r => r.start_time || r.end_time || r.work_content), // 入力がある行のみ送信
-        special_notes: special_notes
+        special_notes: specialNotes
       };
       const response = await axios.post(`${API_URL}/work_records`, payload);
       setMessage(response.data.message);

@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS companies;
 DROP TABLE IF EXISTS holidays;
 DROP TABLE IF EXISTS work_records;
 DROP TABLE IF EXISTS daily_reports;
+DROP TABLE IF EXISTS monthly_reports;
 
 -- 会社マスター
 CREATE TABLE companies (
@@ -39,8 +40,18 @@ CREATE TABLE work_records (
     end_time TEXT, -- 'HH:MM'形式
     break_time TEXT, -- 'HH:MM'形式
     work_content TEXT,
-    special_notes TEXT, -- 特記事項（その月の最初のレコードにのみ格納）
     UNIQUE(employee_id, date),
+    FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
+);
+
+-- 月次レポート情報（特記事項など）
+CREATE TABLE monthly_reports (
+    report_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    special_notes TEXT,
+    UNIQUE(employee_id, year, month),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );
 

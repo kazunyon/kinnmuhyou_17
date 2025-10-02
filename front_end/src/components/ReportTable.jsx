@@ -89,17 +89,15 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
           </tr>
         </thead>
         <tbody>
-          {Array.from({ length: daysInMonth }, (_, i) => {
-            const day = i + 1;
+          {workRecords.map((record, i) => {
+            const day = record.day;
             const date = new Date(year, month, day);
-            const dayOfWeek = getDay(date); // 0:日, 1:月, ...
+            const dayOfWeek = getDay(date);
             const dateStr = format(date, 'yyyy-MM-dd');
             const isSaturday = dayOfWeek === 6;
             const isSunday = dayOfWeek === 0;
             const isHoliday = !!holidays[dateStr];
-            
-            const record = workRecords[i] || {};
-            
+
             const workMinutes = calculateDuration(record.start_time, record.end_time);
             const breakMinutes = timeToMinutes(record.break_time);
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes);
