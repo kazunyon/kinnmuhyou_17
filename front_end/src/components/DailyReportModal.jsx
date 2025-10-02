@@ -126,35 +126,37 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
       <div className="space-y-6">
         <h2 className="text-xl font-bold text-center">日報入力 ({date})</h2>
 
-        {/* 時間入力 */}
-        <div className="space-y-2 p-4 border rounded">
-            {renderTimePicker('startTime', '開始時間')}
-            <div className="flex items-center">
-                {renderTimePicker('endTime', '終了時間')}
-                <div className="flex items-center space-x-2 ml-10">
-                    <span>休憩時間</span>
-                    <select
-                        value={parseInt((times.breakTime || "00:00").split(':')[0]) * 60 + parseInt((times.breakTime || "00:00").split(':')[1])}
-                        onChange={(e) => {
-                            const totalMinutes = parseInt(e.target.value);
-                            const h = Math.floor(totalMinutes / 60);
-                            const m = totalMinutes % 60;
-                            setTimes(prev => ({...prev, breakTime: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}))
-                        }}
-                        className="border rounded p-1">
-                        {breakMinuteOptions.map(opt => <option key={opt} value={opt}>{opt} 分</option>)}
-                    </select>
-                </div>
-            </div>
-        </div>
+        <div className="mx-auto" style={{width: 'fit-content'}}>
+          {/* 時間入力 */}
+          <div className="space-y-2 p-4 border rounded">
+              {renderTimePicker('startTime', '開始時間')}
+              <div className="flex items-center">
+                  {renderTimePicker('endTime', '終了時間')}
+                  <div className="flex items-center space-x-2 ml-10">
+                      <span>休憩時間</span>
+                      <select
+                          value={parseInt((times.breakTime || "00:00").split(':')[0]) * 60 + parseInt((times.breakTime || "00:00").split(':')[1])}
+                          onChange={(e) => {
+                              const totalMinutes = parseInt(e.target.value);
+                              const h = Math.floor(totalMinutes / 60);
+                              const m = totalMinutes % 60;
+                              setTimes(prev => ({...prev, breakTime: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}))
+                          }}
+                          className="border rounded p-1">
+                          {breakMinuteOptions.map(opt => <option key={opt} value={opt}>{opt} 分</option>)}
+                      </select>
+                  </div>
+              </div>
+          </div>
 
-        {/* テキストエリア */}
-        <div className="space-y-4 pl-4">
-          <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
-          <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
-          <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
-          <TextAreaField label="明日する内容" value={reportData.tomorrow_tasks} onChange={(e) => handleDataChange('tomorrow_tasks', e.target.value)} rows={2} />
-          <TextAreaField label="所感" value={reportData.thoughts} onChange={(e) => handleDataChange('thoughts', e.target.value)} rows={2} />
+          {/* テキストエリア */}
+          <div className="space-y-4 p-4 border rounded mt-6">
+            <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
+            <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
+            <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
+            <TextAreaField label="明日する内容" value={reportData.tomorrow_tasks} onChange={(e) => handleDataChange('tomorrow_tasks', e.target.value)} rows={2} />
+            <TextAreaField label="所感" value={reportData.thoughts} onChange={(e) => handleDataChange('thoughts', e.target.value)} rows={2} />
+          </div>
         </div>
         
         {/* ボタン */}
@@ -175,7 +177,6 @@ const TextAreaField = ({ label, value, onChange, rows }) => (
         onChange={onChange}
         rows={rows}
         className="w-full p-2 border rounded"
-        style={{maxWidth: 'calc(50ch + 1rem)'}} // 約50文字で改行されるように
       />
     </div>
 );
