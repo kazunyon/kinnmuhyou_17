@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=BIZ+UDPGothic&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 基本のフォントサイズとフォントファミリーを設定 */
+body {
+  font-family: "BIZ UDPGothic", sans-serif;
+  font-size: 10pt; /* 10ptを基本とする */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 印刷時のスタイル */
+@media print {
+  /* 画面上のUI（ボタンなど）を非表示にする */
+  .no-print {
+    display: none !important;
+  }
+  /* 印刷用のコンテナのみ表示 */
+  .print-container {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    font-size: 9pt; /* 印刷時は少し小さく調整 */
+  }
+  /* ページ区切りを避ける */
+  table, tr, td {
+    page-break-inside: avoid;
+  }
+  /* Tailwindの背景色クラスが印刷されない問題を解決 */
+  .bg-saturday-blue {
+    background-color: #e0f7fa !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .bg-holiday-red {
+    background-color: #ffebee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
