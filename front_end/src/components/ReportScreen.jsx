@@ -1,7 +1,4 @@
-import React, { useState } from 'react';
 import ReportTable from './ReportTable';
-import { format, addMonths, subMonths } from 'date-fns';
-import { ja } from 'date-fns/locale';
 
 // 和暦変換（簡易版）
 const toJapaneseEra = (date) => {

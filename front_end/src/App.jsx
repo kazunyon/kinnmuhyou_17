@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { format, getDaysInMonth, getDay, startOfMonth } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { format, getDaysInMonth } from 'date-fns';
 import ReportScreen from './components/ReportScreen';
 import DailyReportModal from './components/DailyReportModal';
 import MasterModal from './components/MasterModal';

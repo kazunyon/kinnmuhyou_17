@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getDaysInMonth, getDay, startOfMonth, format } from 'date-fns';
+import { useState } from 'react';
+import { getDay, format } from 'date-fns';
 
 const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, onRowClick }) => {
   const [selectedRow, setSelectedRow] = useState(null);
@@ -7,8 +7,6 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
   // 日付、曜日、祝日情報を生成
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const daysInMonth = getDaysInMonth(currentDate);
-  const firstDayOfMonth = startOfMonth(currentDate);
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
   // --- 時間計算ロジック ---
@@ -53,10 +51,6 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
     record[field] = value;
     
     // 自動計算
-    const workMinutes = calculateDuration(record.start_time, record.end_time);
-    const breakMinutes = timeToMinutes(record.break_time);
-    const actualWorkMinutes = workMinutes - breakMinutes;
-    
     // O. 勤務時間, Q. 作業時間 は表示専用なので、直接は更新しない
     
     updatedRecords[dayIndex] = record;
