@@ -10,4 +10,7 @@ package-lock.json
 front_end/package-lock.json
 
 # Jules' temporary verification files
-jules-scratch/
+jules-scratch/back_end/database.db
+back_end/instance/
+back_end/logs/
+back_end/venv/
