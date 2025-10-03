@@ -1,5 +1,5 @@
 import React from 'react';
-import { getDaysInMonth, getDay, startOfMonth, format } from 'date-fns';
+import { getDaysInMonth, getDay, format } from 'date-fns';
 
 const PrintLayout = React.forwardRef((props, ref) => {
   const { employee, company, currentDate, workRecords, holidays } = props;
@@ -40,13 +40,13 @@ const PrintLayout = React.forwardRef((props, ref) => {
     <div ref={ref} className="p-8 bg-white text-black print-container">
       <div className="text-center mb-4">
         <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>
-        <h1 className="text-lg font-bold">作　業　報　告　書</h1>
+        <h1 className="text-lg font-bold" style={{ letterSpacing: '0.5em' }}>作業報告書</h1>
       </div>
-      <div className="flex justify-end mb-4 text-sm">
+      <div className="flex justify-start mb-4 text-sm">
         <div>
           <p>会社名：{company?.company_name}</p>
-          <p>部署　：{employee?.department_name}</p>
-          <p>氏名　：{employee?.employee_name}</p>
+          <p>部署  ：{employee?.department_name}</p>
+          <p>氏名  ：{employee?.employee_name}</p>
         </div>
       </div>
 
@@ -77,7 +77,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
             const isSunday = dayOfWeek === 0;
             const isHoliday = !!holidays[dateStr];
             
-            const record = workRecords[i] || {};
+            const record = workRecords.find(r => r.report_date === dateStr) || {};
             const workMinutes = calculateDuration(record.start_time, record.end_time);
             const breakMinutes = timeToMinutes(record.break_time);
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes);
@@ -117,6 +117,8 @@ const PrintLayout = React.forwardRef((props, ref) => {
     </div>
   );
 });
+
+PrintLayout.displayName = 'PrintLayout';
 
 export default PrintLayout;
 
