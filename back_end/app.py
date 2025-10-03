@@ -2,14 +2,15 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, send_from_directory
 from flask_cors import CORS
 import sqlite3
 
 # -----------------------------------------------------------------------------
 # アプリケーション設定
 # -----------------------------------------------------------------------------
-app = Flask(__name__)
+# 本番環境でフロントエンドのビルド成果物を配信できるように、static_folderを設定
+app = Flask(__name__, static_folder='../front_end/dist')
 CORS(app)  # CORSを有効にし、フロントエンドからのアクセスを許可
 
 # データベースファイルのパス
@@ -331,5 +332,26 @@ def update_employee(employee_id):
         app.logger.error(f"社員情報更新エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+# -----------------------------------------------------------------------------
+# フロントエンド配信
+# -----------------------------------------------------------------------------
+# API以外のルートは、フロントエンド(React)側でルーティングを処理する
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """フロントエンドの静的ファイル(assets)またはindex.htmlを配信する"""
+    app.logger.info(f"フロントエンド配信リクエスト受信: path='{path}'")
+    # 要求されたパスがビルド後の静的ファイルとして存在する場合
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        # そのファイルを配信
+        app.logger.info(f"静的ファイル '{path}' を配信します。")
+        return send_from_directory(app.static_folder, path)
+    else:
+        # それ以外の場合は、Reactアプリのエントリーポイントであるindex.htmlを配信
+        app.logger.info("index.html を配信します。")
+        return send_from_directory(app.static_folder, 'index.html')
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    # waitressのような本番用WSGIサーバーで実行することを推奨
+    # 例: waitress-serve --host 0.0.0.0 --port 5000 back_end.app:app
+    app.run(debug=True, port=5000)
