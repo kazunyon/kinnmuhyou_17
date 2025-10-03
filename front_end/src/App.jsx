@@ -9,7 +9,9 @@ import PrintLayout from './components/PrintLayout';
 import { useReactToPrint } from 'react-to-print';
 
 // APIのベースURL
-const API_URL = 'http://localhost:5000/api';
+// 開発環境(vite dev)ではvite.config.jsのプロキシ設定が、
+// 本番環境(flask serve)では同じオリジンからの配信が使われるため、相対パスが最適。
+const API_URL = '/api';
 
 function App() {
   // --- State定義 ---
