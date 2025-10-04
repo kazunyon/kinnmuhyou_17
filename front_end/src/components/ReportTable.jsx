@@ -77,9 +77,9 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
             <th className="border border-gray-300 p-1 w-[30%]">作業内容</th>
             <th className="border border-gray-300 p-1 w-[8%]">①出社時刻</th>
             <th className="border border-gray-300 p-1 w-[8%]">②退社時刻</th>
-            <th className="border border-gray-300 p-1 w-[10%]">③勤務時間<br/>(②-①)</th>
+            <th className="border border-gray-300 p-1 w-[8%]">③勤務時間<br/>(②-①)</th>
             <th className="border border-gray-300 p-1 w-[8%]">④休憩時間</th>
-            <th className="border border-gray-300 p-1 w-[10%]">⑤作業時間<br/>(③-④)</th>
+            <th className="border border-gray-300 p-1 w-[8%]">⑤作業時間<br/>(③-④)</th>
           </tr>
         </thead>
         <tbody>
