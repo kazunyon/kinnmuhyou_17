@@ -1,0 +1,47 @@
+import React from 'react';
+
+const DailyReportListPrint = React.forwardRef((props, ref) => {
+  const { reports, year, month } = props;
+
+  if (!reports || reports.length === 0) {
+    return null;
+  }
+
+  return (
+    <div ref={ref} className="p-4 bg-white text-black">
+      <h2 className="text-xl font-bold text-center mb-4">日報一覧 ({year}年{month}月)</h2>
+      <table className="w-full text-left border-collapse text-xs">
+        <thead>
+          <tr className="bg-gray-200">
+            <th className="p-2 border border-black w-[4%]">日付</th>
+            <th className="p-2 border border-black w-[4%]">曜日</th>
+            <th className="p-2 border border-black w-[7%]">作業時間</th>
+            <th className="p-2 border border-black w-[30.6%]">作業内容</th>
+            <th className="p-2 border border-black w-[13.6%]">問題点</th>
+            <th className="p-2 border border-black w-[13.6%]">課題</th>
+            <th className="p-2 border border-black w-[13.6%]">明日する内容</th>
+            <th className="p-2 border border-black w-[13.6%]">所感</th>
+          </tr>
+        </thead>
+        <tbody>
+          {reports.map((report) => (
+            <tr key={report.date} className="align-top">
+              <td className="p-2 border border-black text-center">{report.date}</td>
+              <td className="p-2 border border-black text-center">{report.dayOfWeek}</td>
+              <td className="p-2 border border-black text-center">{report.workTime}</td>
+              <td className="p-2 border border-black whitespace-pre-wrap">{report.work_summary}</td>
+              <td className="p-2 border border-black whitespace-pre-wrap">{report.problems}</td>
+              <td className="p-2 border border-black whitespace-pre-wrap">{report.challenges}</td>
+              <td className="p-2 border border-black whitespace-pre-wrap">{report.tomorrow_tasks}</td>
+              <td className="p-2 border border-black whitespace-pre-wrap">{report.thoughts}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+});
+
+DailyReportListPrint.displayName = 'DailyReportListPrint';
+
+export default DailyReportListPrint;
