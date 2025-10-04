@@ -84,52 +84,54 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
   }, [isOpen, employeeId, year, month]);
 
   return (
-    <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="日報一覧">
-      <div className="flex flex-col h-full">
-        <h2 className="text-xl font-bold text-center mb-4">日報一覧 ({year}年{month}月)</h2>
-        <div className="flex-grow overflow-auto">
-          {isLoading ? (
-            <p>読み込み中...</p>
-          ) : (
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-gray-200">
-                  <th className="p-2 border w-[4%]">日付</th>
-                  <th className="p-2 border w-[4%]">曜日</th>
-                  <th className="p-2 border w-[7%]">作業時間</th>
-                  <th className="p-2 border w-[30.6%]">作業内容</th>
-                  <th className="p-2 border w-[13.6%]">問題点</th>
-                  <th className="p-2 border w-[13.6%]">課題</th>
-                  <th className="p-2 border w-[13.6%]">明日する内容</th>
-                  <th className="p-2 border w-[13.6%]">所感</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((report) => (
-                  <tr key={report.date} className="hover:bg-gray-50 align-top">
-                    <td className="p-2 border text-center">{report.date}</td>
-                    <td className="p-2 border text-center">{report.dayOfWeek}</td>
-                    <td className="p-2 border text-center">{report.workTime}</td>
-                    <td className="p-2 border whitespace-pre-wrap">{report.work_summary}</td>
-                    <td className="p-2 border whitespace-pre-wrap">{report.problems}</td>
-                    <td className="p-2 border whitespace-pre-wrap">{report.challenges}</td>
-                    <td className="p-2 border whitespace-pre-wrap">{report.tomorrow_tasks}</td>
-                    <td className="p-2 border whitespace-pre-wrap">{report.thoughts}</td>
+    <>
+      <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="日報一覧">
+        <div className="flex flex-col h-full">
+          <h2 className="text-xl font-bold text-center mb-4">日報一覧 ({year}年{month}月)</h2>
+          <div className="flex-grow overflow-auto">
+            {isLoading ? (
+              <p>読み込み中...</p>
+            ) : (
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="p-2 border w-[4%]">日付</th>
+                    <th className="p-2 border w-[4%]">曜日</th>
+                    <th className="p-2 border w-[7%]">作業時間</th>
+                    <th className="p-2 border w-[30.6%]">作業内容</th>
+                    <th className="p-2 border w-[13.6%]">問題点</th>
+                    <th className="p-2 border w-[13.6%]">課題</th>
+                    <th className="p-2 border w-[13.6%]">明日する内容</th>
+                    <th className="p-2 border w-[13.6%]">所感</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {reports.map((report) => (
+                    <tr key={report.date} className="hover:bg-gray-50 align-top">
+                      <td className="p-2 border text-center">{report.date}</td>
+                      <td className="p-2 border text-center">{report.dayOfWeek}</td>
+                      <td className="p-2 border text-center">{report.workTime}</td>
+                      <td className="p-2 border whitespace-pre-wrap">{report.work_summary}</td>
+                      <td className="p-2 border whitespace-pre-wrap">{report.problems}</td>
+                      <td className="p-2 border whitespace-pre-wrap">{report.challenges}</td>
+                      <td className="p-2 border whitespace-pre-wrap">{report.tomorrow_tasks}</td>
+                      <td className="p-2 border whitespace-pre-wrap">{report.thoughts}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="flex justify-end mt-4">
+            <button onClick={handlePrint} className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">印刷</button>
+            <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
+          </div>
         </div>
-        <div className="flex justify-end mt-4">
-          <button onClick={handlePrint} className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">印刷</button>
-          <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
-        </div>
-      </div>
+      </Modal>
       <div style={{ display: "none" }}>
         <DailyReportListPrint ref={printComponentRef} reports={reports} year={year} month={month} />
       </div>
-    </Modal>
+    </>
   );
 };
 

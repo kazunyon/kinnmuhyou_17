@@ -71,25 +71,25 @@ export const exportWorkReportToExcel = async (masterData, year, month, reportRow
   // タイトル
   worksheet.mergeCells('B4:F4');
   const titleCell = worksheet.getCell('B4');
-  titleCell.value = '作　業　報　告　書';
+  titleCell.value = '作業報告書';
   titleCell.font = { size: 16, bold: true };
   titleCell.alignment = { horizontal: 'center' };
 
   // 会社名
   worksheet.mergeCells('B5:F5');
-  worksheet.getCell('B5').value = `会社名　　：　${masterData.company_name || ''}`;
+  worksheet.getCell('B5').value = `会社名： ${masterData.company_name || ''}`;
 
   // 部署名（ユーザー要件）
   worksheet.mergeCells('B6:F6');
   const departmentCell = worksheet.getCell('B6');
-  departmentCell.value = `部署　　　：　${masterData.department_name || ''}`;
+  departmentCell.value = `部署： ${masterData.department_name || ''}`;
   departmentCell.font = { underline: true };
   departmentCell.alignment = { horizontal: 'left' };
 
   // 氏名（ユーザー要件）
   worksheet.mergeCells('B7:F7');
   const employeeCell = worksheet.getCell('B7');
-  employeeCell.value = `氏名　　　：　${masterData.employee_name || ''}`;
+  employeeCell.value = `氏名： ${masterData.employee_name || ''}`;
   employeeCell.font = { underline: true };
   employeeCell.alignment = { horizontal: 'left' };
 

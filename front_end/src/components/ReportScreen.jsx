@@ -52,8 +52,8 @@ const ReportScreen = ({
         </div>
 
         {/* タイトル */}
-        <h1 className="text-center text-lg font-bold" style={{fontSize: '14pt'}}>
-          作　業　報　告　書
+        <h1 className="text-center text-lg font-bold" style={{fontSize: '14pt', letterSpacing: '0.5em'}}>
+          作業報告書
         </h1>
 
         {/* ボタンエリア */}
@@ -68,15 +68,15 @@ const ReportScreen = ({
 
       {/* 社員情報 */}
       <div className="mb-4 space-y-1 text-10pt">
-        <div className="border-b border-black pb-1" style={{ width: '300px' }}>
-          会社名　：{company?.company_name || ''}
+        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+          <span className="inline-block w-14">会社名</span>：{company?.company_name || ''}
         </div>
-        <div className="border-b border-black pb-1" style={{ width: '300px' }}>
-          部署　　：{selectedEmployee?.department_name || ''}
+        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+          <span className="inline-block w-14">部署</span>：{selectedEmployee?.department_name || ''}
         </div>
-        <div className="border-b border-black pb-1" style={{ width: '300px' }}>
-          氏名　　：
-          <select value={selectedEmployee?.employee_id || ''} onChange={(e) => onEmployeeChange(e.target.value)} className="ml-2 border-none bg-transparent">
+        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+          <span className="inline-block w-14">氏名</span>：
+          <select value={selectedEmployee?.employee_id || ''} onChange={(e) => onEmployeeChange(e.target.value)} className="ml-1 border-none bg-transparent">
              {employees.map(emp => (
                <option key={emp.employee_id} value={emp.employee_id}>
                  {emp.employee_name}
