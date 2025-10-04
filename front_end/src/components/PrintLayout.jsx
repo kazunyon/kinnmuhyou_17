@@ -76,8 +76,8 @@ const PrintLayout = React.forwardRef((props, ref) => {
             const isSaturday = dayOfWeek === 6;
             const isSunday = dayOfWeek === 0;
             const isHoliday = !!holidays[dateStr];
-            
-            const record = workRecords.find(r => r.report_date === dateStr) || {};
+
+            const record = workRecords.find(r => r.day === day) || {};
             const workMinutes = calculateDuration(record.start_time, record.end_time);
             const breakMinutes = timeToMinutes(record.break_time);
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes);
