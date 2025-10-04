@@ -26,10 +26,19 @@ body {
 
 /* 印刷時のスタイル */
 @media print {
-  body {
-    margin: 0;
-    padding: 0;
-    font-size: 9pt; /* 印刷時は少し小さく調整 */
+  body, html {
+    visibility: hidden;
+  }
+
+  .print-container, .print-container * {
+    visibility: visible;
+  }
+
+  .print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
   }
 
   /* 画面上のUI（ボタンなど）を非表示にする */
@@ -37,24 +46,12 @@ body {
     display: none !important;
   }
 
-  /* 印刷用のコンテナのみ表示 */
-  .print-container {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-  }
-
-  /* 印刷時にモーダルのヘッダーとフッターを非表示にする */
-  .ReactModal__Content .flex.justify-end,
-  .ReactModal__Content .text-xl.font-bold.text-center {
+  /* React Modal関連の要素をすべて非表示にする */
+  .ReactModal__Overlay {
     display: none;
   }
-
-  /* 印刷用のコンテンツがスペースを埋めるようにする */
-  .ReactModal__Content .flex-grow {
-    height: auto;
-    overflow: visible;
+  .ReactModal__Content {
+     display: none;
   }
 
   /* テーブルの罫線を黒にする */
