@@ -90,11 +90,11 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
                   <th className="p-2 border w-[4%]">日付</th>
                   <th className="p-2 border w-[4%]">曜日</th>
                   <th className="p-2 border w-[7%]">作業時間</th>
-                  <th className="p-2 border w-[17%]">作業内容</th>
-                  <th className="p-2 border w-[17%]">問題点</th>
-                  <th className="p-2 border w-[17%]">課題</th>
-                  <th className="p-2 border w-[17%]">明日する内容</th>
-                  <th className="p-2 border w-[17%]">所感</th>
+                  <th className="p-2 border w-[30.6%]">作業内容</th>
+                  <th className="p-2 border w-[13.6%]">問題点</th>
+                  <th className="p-2 border w-[13.6%]">課題</th>
+                  <th className="p-2 border w-[13.6%]">明日する内容</th>
+                  <th className="p-2 border w-[13.6%]">所感</th>
                 </tr>
               </thead>
               <tbody>

@@ -1,12 +1,16 @@
 # Log files
+logs/
 *.log
 
-# Node.js dependencies
-node_modules/
-front_end/node_modules/
+# Verification directories
+jules-scratch/
+temp_verify/
 
-# SQLite database
+# Database files
 *.db
 
-# Temporary verification directory
-jules-scratch/
+# Node dependencies
+front_end/node_modules/
+
+# Python cache
+back_end/__pycache__/
