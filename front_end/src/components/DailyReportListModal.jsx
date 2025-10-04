@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from 'react-modal';
 import axios from 'axios';
 import { getDaysInMonth, getDay, format } from 'date-fns';
+import { useReactToPrint } from 'react-to-print';
+import DailyReportListPrint from './DailyReportListPrint';
 
-const API_URL = 'http://127.0.0.1:5000/api';
+const API_URL = '/api';
 
 const modalStyles = {
   content: {
@@ -19,6 +21,11 @@ const modalStyles = {
 const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month }) => {
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const printComponentRef = useRef();
+  const handlePrint = useReactToPrint({
+    content: () => printComponentRef.current,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -115,8 +122,12 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
           )}
         </div>
         <div className="flex justify-end mt-4">
+          <button onClick={handlePrint} className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 mr-2">印刷</button>
           <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
         </div>
+      </div>
+      <div style={{ display: "none" }}>
+        <DailyReportListPrint ref={printComponentRef} reports={reports} year={year} month={month} />
       </div>
     </Modal>
   );
