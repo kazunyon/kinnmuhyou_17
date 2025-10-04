@@ -1,16 +1,12 @@
 # Log files
 *.log
 
-# Node dependencies
+# Node.js dependencies
 node_modules/
 front_end/node_modules/
 
-# Lockfiles
-package-lock.json
-front_end/package-lock.json
+# SQLite database
+*.db
 
-# Jules' temporary verification files
-jules-scratch/back_end/database.db
-back_end/instance/
-back_end/logs/
-back_end/venv/
+# Temporary verification directory
+jules-scratch/
