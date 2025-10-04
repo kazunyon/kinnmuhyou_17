@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import axios from 'axios';
 
-const API_URL = 'http://127.0.0.1:5000/api';
+const API_URL = '/api';
 
 const modalStyles = {
   content: {
     top: '50%', left: '50%', right: 'auto', bottom: 'auto',
     marginRight: '-50%', transform: 'translate(-50%, -50%)',
-    width: '800px', maxHeight: '90vh', padding: '2rem',
+    width: '1200px', maxHeight: '90vh', padding: '2rem',
   },
   overlay: {
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
@@ -126,9 +126,9 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
       <div className="space-y-6">
         <h2 className="text-xl font-bold text-center">日報入力 ({date})</h2>
 
-        <div className="mx-auto" style={{width: 'fit-content'}}>
+        <div className="mx-auto">
           {/* 時間入力 */}
-          <div className="space-y-2 p-4 border rounded">
+          <div className="space-y-2 p-4 border rounded w-full">
               {renderTimePicker('startTime', '開始時間')}
               <div className="flex items-center">
                   {renderTimePicker('endTime', '終了時間')}

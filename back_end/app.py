@@ -354,4 +354,4 @@ def serve_frontend(path):
 if __name__ == '__main__':
     # waitressのような本番用WSGIサーバーで実行することを推奨
     # 例: waitress-serve --host 0.0.0.0 --port 5000 back_end.app:app
-    app.run(debug=True, port=5000)
+    app.run(debug=True, use_reloader=False, port=5000)
