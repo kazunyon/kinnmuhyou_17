@@ -1,16 +1,20 @@
-# Log files
-logs/
+# Python
+__pycache__/
+*.pyc
+
+# Logs
 *.log
+logs/
 
-# Verification directories
-jules-scratch/
-temp_verify/
-
-# Database files
-*.db
-
-# Node dependencies
+# Node.js
+node_modules/
 front_end/node_modules/
 
-# Python cache
-back_end/__pycache__/
+# OS / Editor specific
+.DS_Store
+.vscode/
+
+# Temporary files
+jules-scratch/
+temp_verify/
+*.db
