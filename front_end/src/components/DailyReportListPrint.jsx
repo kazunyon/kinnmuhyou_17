@@ -8,7 +8,7 @@ const DailyReportListPrint = React.forwardRef((props, ref) => {
   }
 
   return (
-    <div ref={ref} className="p-4 bg-white text-black">
+    <div ref={ref} className="p-4 bg-white text-black print-container">
       <h2 className="text-xl font-bold text-center mb-4">日報一覧 ({year}年{month}月)</h2>
       <table className="w-full text-left border-collapse text-xs print-table">
         <thead>
