@@ -1,6 +1,9 @@
 # Python
 __pycache__/
 *.pyc
+back_end/venv/
+venv/
+*/venv/
 
 # Logs
 *.log
