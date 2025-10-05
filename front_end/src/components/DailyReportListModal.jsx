@@ -128,7 +128,7 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
           </div>
         </div>
       </Modal>
-      <div style={{ visibility: 'hidden', height: 0, overflow: 'hidden' }}>
+      <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
         <DailyReportListPrint ref={printComponentRef} reports={reports} year={year} month={month} />
       </div>
     </>
