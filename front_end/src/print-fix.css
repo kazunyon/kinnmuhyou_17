@@ -1,0 +1,27 @@
+/* print-fix.css */
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  /* タイトルで改ページさせない */
+  .print-title { break-after: avoid !important; }
+
+  /* テーブルの先頭で改ページを強制していたら解除 */
+  .report-table {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* 行は途中改ページしにくくする（見切れ防止） */
+  .report-table tr { page-break-inside: avoid !important; }
+
+  /* もし既存に page-break / break クラスがあれば無効化 */
+  .page-break,
+  .break-before,
+  .break-after {
+    break-before: auto !important;
+    break-after: auto !important;
+    page-break-before: auto !important;
+    page-break-after: auto !important;
+  }
+}

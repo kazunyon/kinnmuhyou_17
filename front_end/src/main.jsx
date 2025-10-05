@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
+import './print-fix.css'
 import Modal from 'react-modal';
 
 // モーダルを使用する際のおまじない
