@@ -36,10 +36,13 @@ CREATE TABLE work_records (
     record_id INTEGER PRIMARY KEY AUTOINCREMENT,
     employee_id INTEGER NOT NULL,
     date TEXT NOT NULL, -- 'YYYY-MM-DD'形式
+    holiday_type TEXT, -- 休日種別: '法定休', '所定休' など
+    attendance_type TEXT, -- 勤怠種別: '有休', '欠勤' など
     start_time TEXT, -- 'HH:MM'形式
     end_time TEXT, -- 'HH:MM'形式
-    break_time TEXT, -- 'HH:MM'形式
-    work_content TEXT,
+    break_time TEXT, -- 'HH:MM'形式 (5:00-22:00の休憩)
+    night_break_time TEXT, -- 'HH:MM'形式 (22:00-5:00の休憩)
+    work_content TEXT, -- 作業内容 (作業報告書画面で使用) / 備考 (勤怠管理表画面で使用)
     UNIQUE(employee_id, date),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );

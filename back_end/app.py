@@ -2,9 +2,12 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+import calendar
 from flask import Flask, jsonify, request, g, send_from_directory
 from flask_cors import CORS
 import sqlite3
+
+from attendance_calculator import AttendanceCalculator
 
 # -----------------------------------------------------------------------------
 # アプリケーション設定
@@ -199,6 +202,156 @@ def save_work_records():
     except Exception as e:
         db.rollback()
         app.logger.error(f"作業記録保存エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+# -----------------------------------------------------------------------------
+# 勤怠管理表用API
+# -----------------------------------------------------------------------------
+
+@app.route('/api/attendance_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
+def get_attendance_records(employee_id, year, month):
+    """指定された社員と年月の勤怠データを、日次・月次集計と共に取得する"""
+    try:
+        db = get_db()
+        calculator = AttendanceCalculator()
+
+        # 1. 該当月のDB記録を取得
+        cursor = db.execute("""
+            SELECT * FROM work_records
+            WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
+        """, (employee_id, f"{year:04d}", f"{month:02d}"))
+
+        records_map = {int(row['date'].split('-')[2]): dict(row) for row in cursor.fetchall()}
+
+        # 2. 該当年の祝日を取得
+        cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (f"{year:04d}",))
+        holidays_set = {row['date'] for row in cursor.fetchall()}
+
+        # 3. 月の日数分ループして、日次データとサマリーを作成
+        _, num_days = calendar.monthrange(year, month)
+        all_daily_data = []
+
+        for day in range(1, num_days + 1):
+            date_str = f"{year:04d}-{month:02d}-{day:02d}"
+            db_record = records_map.get(day, {})
+
+            # カレンダー情報（曜日、祝日）を追加
+            weekday = datetime(year, month, day).weekday() # 0=月, 6=日
+            is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6] # 土日または祝日
+
+            # 日次計算用のデータを作成
+            calc_input = {
+                'start_time': db_record.get('start_time'),
+                'end_time': db_record.get('end_time'),
+                'break_time': db_record.get('break_time'),
+                'night_break_time': db_record.get('night_break_time'),
+                'holiday_type': db_record.get('holiday_type'),
+                'is_holiday_from_calendar': is_holiday_from_calendar
+            }
+            daily_summary = calculator.calculate_daily_summary(calc_input)
+
+            # フロントエンドに返すデータ構造
+            daily_data = {
+                "day": day,
+                "date": date_str,
+                "weekday": weekday,
+                # DBからの入力値
+                "holiday_type": db_record.get('holiday_type'),
+                "attendance_type": db_record.get('attendance_type'),
+                "start_time": db_record.get('start_time'),
+                "end_time": db_record.get('end_time'),
+                "break_time": db_record.get('break_time'),
+                "night_break_time": db_record.get('night_break_time'),
+                "remarks": db_record.get('work_content'), # 備考
+                # 計算結果
+                "daily_summary": daily_summary
+            }
+            all_daily_data.append(daily_data)
+
+        # 4. 月次サマリーを計算
+        monthly_summary = calculator.calculate_monthly_summary(all_daily_data)
+
+        app.logger.info(f"勤怠データ取得成功: 社員ID={employee_id}, 年月={year}-{month}")
+        return jsonify({
+            "daily_records": all_daily_data,
+            "monthly_summary": monthly_summary
+        })
+
+    except Exception as e:
+        app.logger.error(f"勤怠データ取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/attendance_records', methods=['POST'])
+def save_attendance_records():
+    """勤怠データを保存（更新または新規作成）する"""
+    data = request.json
+    employee_id = data.get('employee_id')
+    records = data.get('records')
+
+    if not all([employee_id, isinstance(records, list)]):
+        app.logger.warning("勤怠データ保存API: 不正なリクエストデータです。")
+        return jsonify({"error": "無効なデータです"}), 400
+
+    db = get_db()
+    try:
+        for record in records:
+            date_str = record.get('date')
+            if not date_str:
+                continue
+
+            cursor = db.execute(
+                "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
+                (employee_id, date_str)
+            )
+            record_row = cursor.fetchone()
+
+            # 保存するデータ
+            params = {
+                'employee_id': employee_id,
+                'date': date_str,
+                'holiday_type': record.get('holiday_type'),
+                'attendance_type': record.get('attendance_type'),
+                'start_time': record.get('start_time'),
+                'end_time': record.get('end_time'),
+                'break_time': record.get('break_time'),
+                'night_break_time': record.get('night_break_time'),
+                'work_content': record.get('remarks') # 備考
+            }
+
+            if record_row:
+                # 更新
+                params['record_id'] = record_row['record_id']
+                db.execute("""
+                    UPDATE work_records SET
+                    holiday_type=:holiday_type, attendance_type=:attendance_type, start_time=:start_time,
+                    end_time=:end_time, break_time=:break_time, night_break_time=:night_break_time,
+                    work_content=:work_content
+                    WHERE record_id=:record_id
+                """, params)
+            else:
+                # 新規作成
+                db.execute("""
+                    INSERT INTO work_records (
+                        employee_id, date, holiday_type, attendance_type, start_time,
+                        end_time, break_time, night_break_time, work_content
+                    ) VALUES (
+                        :employee_id, :date, :holiday_type, :attendance_type, :start_time,
+                        :end_time, :break_time, :night_break_time, :work_content
+                    )
+                """, params)
+
+        db.commit()
+        app.logger.info(f"勤怠データ保存成功: 社員ID={employee_id}")
+        return jsonify({"message": "保存しました"}), 200
+    except sqlite3.Error as e:
+        db.rollback()
+        app.logger.error(f"勤怠データ保存エラー (DB): {e}")
+        return jsonify({"error": "データベースエラー"}), 500
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"勤怠データ保存エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 
