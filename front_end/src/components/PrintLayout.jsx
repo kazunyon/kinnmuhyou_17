@@ -106,12 +106,11 @@ const PrintLayout = React.forwardRef((props, ref) => {
                 <td className="border border-black p-1" colSpan="4"></td>
             </tr>
             <tr>
-                <td className="border border-black p-1 align-top" rowSpan="2">特記事項</td>
+                <td className="border border-black p-1 align-top">特記事項</td>
                 <td className="border border-black p-1 h-24 align-top" colSpan="6">
                   {/* 特記事項はここでは表示しない想定 */}
                 </td>
             </tr>
-             <tr><td className="border border-black p-1 h-24" colSpan="6"></td></tr>
         </tfoot>
       </table>
     </div>
