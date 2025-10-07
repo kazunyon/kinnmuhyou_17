@@ -88,10 +88,10 @@ const PrintLayout = React.forwardRef((props, ref) => {
         {/* テーブルヘッダー */}
         <thead>
           <tr className="bg-gray-200">
-            <th className="border border-black p-1 w-[40px]">日付</th>
-            <th className="border border-black p-1 w-[40px]">曜日</th>
-            <th className="border border-black p-1 w-[70px]">作業時間</th>
-            <th className="border border-black p-1">作業内容</th>
+            <th className="border border-black p-1 w-[10%]">日付</th>
+            <th className="border border-black p-1 w-[10%]">曜日</th>
+            <th className="border border-black p-1 w-[15%]">作業時間</th>
+            <th className="border border-black p-1 w-[65%]">作業内容</th>
           </tr>
         </thead>
         {/* テーブルボディ */}
