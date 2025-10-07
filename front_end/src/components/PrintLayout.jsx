@@ -68,7 +68,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
 
   return (
     // refはreact-to-printに印刷対象を教えるために必要
-    <div ref={ref} className="p-8 bg-white text-black print-container">
+    <div ref={ref} className="bg-white text-black print-container">
       {/* ヘッダー：タイトルと年月 */}
       <div className="text-center mb-4">
         <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>

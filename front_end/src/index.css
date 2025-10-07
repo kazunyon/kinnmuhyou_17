@@ -12,8 +12,8 @@
 
 /* 印刷設定 */
 @page {
-  size: landscape;
-  margin: 20mm;
+  size: portrait; /* A4縦 */
+  margin: 10mm; /* 余白を10mmに設定 */
 }
 
 /* 基本のフォントサイズとフォントファミリーを設定 */
