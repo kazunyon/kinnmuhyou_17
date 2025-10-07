@@ -53,10 +53,10 @@ const PrintLayout = React.forwardRef((props, ref) => {
       <table className="w-full border-collapse border border-black text-xs" style={{ tableLayout: 'fixed' }}>
         <thead>
           <tr className="bg-gray-200">
-            <th className="border border-black p-0.5 w-[35px]">日付</th>
-            <th className="border border-black p-0.5 w-[35px]">曜日</th>
-            <th className="border border-black p-0.5 w-[60px]">作業時間</th>
-            <th className="border border-black p-0.5">作業内容</th>
+            <th className="border border-black p-1 w-[40px]">日付</th>
+            <th className="border border-black p-1 w-[40px]">曜日</th>
+            <th className="border border-black p-1 w-[70px]">作業時間</th>
+            <th className="border border-black p-1">作業内容</th>
           </tr>
         </thead>
         <tbody>
@@ -64,7 +64,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
             const day = i + 1;
             if (day > daysInMonth) {
                 return (
-                    <tr key={day} style={{ height: '24px' }}><td className="border border-black" colSpan="4"></td></tr>
+                    <tr key={day} style={{ height: '28px' }}><td className="border border-black" colSpan="4"></td></tr>
                 );
             }
             const date = new Date(year, month, day);
@@ -84,24 +84,24 @@ const PrintLayout = React.forwardRef((props, ref) => {
               isSaturday ? 'bg-blue-100' : '';
 
             return (
-              <tr key={day} className={rowClass} style={{ height: '24px' }}>
-                <td className="border border-black p-0.5 text-center">{day}</td>
-                <td className="border border-black p-0.5 text-center">{weekdays[dayOfWeek]}</td>
-                <td className="border border-black p-0.5 text-center">{minutesToTime(actualWorkMinutes) || ''}</td>
-                <td className="border border-black p-0.5 text-left whitespace-pre-wrap break-words">{record.work_content}</td>
+              <tr key={day} className={rowClass} style={{ height: '28px' }}>
+                <td className="border border-black p-1 text-center">{day}</td>
+                <td className="border border-black p-1 text-center">{weekdays[dayOfWeek]}</td>
+                <td className="border border-black p-1 text-center">{minutesToTime(actualWorkMinutes) || ''}</td>
+                <td className="border border-black p-1 text-left whitespace-pre-wrap break-words">{record.work_content}</td>
               </tr>
             );
           })}
         </tbody>
         <tfoot>
-            <tr style={{ height: '24px' }}>
-                <td className="border border-black p-0.5 text-center font-bold" colSpan="2">合計</td>
-                <td className="border border-black p-0.5 text-center font-bold">{minutesToTime(totalWorkTimeMinutes)}</td>
-                <td className="border border-black p-0.5"></td>
+            <tr style={{ height: '28px' }}>
+                <td className="border border-black p-1 text-center font-bold" colSpan="2">合計</td>
+                <td className="border border-black p-1 text-center font-bold">{minutesToTime(totalWorkTimeMinutes)}</td>
+                <td className="border border-black p-1"></td>
             </tr>
             <tr>
-                <td className="border border-black p-0.5 align-top" rowSpan="10">特記事項</td>
-                <td className="p-0.5 align-top border-t border-r border-black" colSpan="3" rowSpan="10" style={{ height: '240px' }}></td>
+                <td className="border border-black p-1 align-top" rowSpan="10">特記事項</td>
+                <td className="p-1 align-top border-t border-r border-black" colSpan="3" rowSpan="10" style={{ height: '280px' }}></td>
             </tr>
             {/* Empty rows to fill the space for rowSpan */}
             {Array.from({ length: 9 }).map((_, i) => (
