@@ -96,15 +96,9 @@ const PrintLayout = React.forwardRef((props, ref) => {
         </thead>
         {/* テーブルボディ */}
         <tbody>
-          {/* 1ヶ月（31日分）の行を生成 */}
-          {Array.from({ length: 31 }, (_, i) => {
+          {/* 1ヶ月分の行を生成 */}
+          {Array.from({ length: daysInMonth }, (_, i) => {
             const day = i + 1;
-            // 月の最終日を超えたら空行をレンダリング
-            if (day > daysInMonth) {
-                return (
-                    <tr key={day} style={{ height: '28px' }}><td className="border border-black" colSpan="4"></td></tr>
-                );
-            }
             const date = new Date(year, month, day);
             const dayOfWeek = getDay(date);
             const dateStr = format(date, 'yyyy-MM-dd');
@@ -144,11 +138,11 @@ const PrintLayout = React.forwardRef((props, ref) => {
             </tr>
             {/* 特記事項 */}
             <tr>
-                <td className="border border-black p-1 align-top" rowSpan="10">特記事項</td>
-                <td className="p-1 align-top border-t border-r border-black" colSpan="3" rowSpan="10" style={{ height: '280px' }}></td>
+                <td className="border border-black p-1 align-top" rowSpan="4">特記事項</td>
+                <td className="p-1 align-top border-t border-r border-black" colSpan="3" rowSpan="4" style={{ height: '112px' }}></td>
             </tr>
             {/* rowSpanを使用するために必要な空の行。CSSで非表示にする */}
-            {Array.from({ length: 9 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
                 <tr key={`note-fill-${i}`} className="hidden">
                     <td colSpan="3"></td>
                 </tr>
