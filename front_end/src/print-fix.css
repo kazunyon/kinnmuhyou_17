@@ -11,7 +11,7 @@
   .print-container {
     width: 100%;
     /* コンテンツ全体を縮小して1ページに収める */
-    transform: scale(0.7);
+/*    transform: scale(0.7); */
     transform-origin: top left;
   }
 
