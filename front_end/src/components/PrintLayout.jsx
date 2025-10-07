@@ -106,10 +106,16 @@ const PrintLayout = React.forwardRef((props, ref) => {
                 <td className="border border-black p-1" colSpan="4"></td>
             </tr>
             <tr>
-                <td className="border border-black p-1 align-top">特記事項</td>
-                <td className="border border-black p-1 h-24 align-top" colSpan="6">
-                  {/* 特記事項はここでは表示しない想定 */}
-                </td>
+                <td className="border border-black p-1 align-top" rowSpan="10">特記事項</td>
+                <td className="border-t border-r border-black p-1 h-8" colSpan="6">&nbsp;</td>
+            </tr>
+            {Array.from({ length: 8 }).map((_, i) => (
+                <tr key={`note-row-${i}`}>
+                    <td className="border-r border-black p-1 h-8" colSpan="6">&nbsp;</td>
+                </tr>
+            ))}
+            <tr>
+                <td className="border-b border-r border-black p-1 h-8" colSpan="6">&nbsp;</td>
             </tr>
         </tfoot>
       </table>
