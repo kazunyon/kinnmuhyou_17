@@ -68,33 +68,33 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
    * @param {string} value - 新しい値
    */
   const handleInputChange = (dayIndex, field, value) => {
-    // workRecordsのコピーを作成して直接変更を防ぐ (Immutability)
     const updatedRecords = [...workRecords];
     const record = { ...updatedRecords[dayIndex] };
-    
-    // 時間入力の場合、値を15分刻みに丸める
-    if (field === 'start_time' || field === 'end_time' || field === 'break_time') {
-      if (value) { // 値が空でない場合のみ処理
+
+    // 更新したレコードの値を設定
+    record[field] = value;
+
+    // もし作業内容が「休み」と入力されたら、関連する時間を0にする
+    if (field === 'work_content' && value.trim() === '休み') {
+      record.start_time = '00:00';
+      record.end_time = '00:00';
+      record.break_time = '00:00';
+    } else if (field === 'start_time' || field === 'end_time' || field === 'break_time') {
+      // 時間入力の場合、値を15分刻みに丸める
+      if (value) {
         const [h, m] = value.split(':');
         const minutes = parseInt(m, 10);
         const roundedMinutes = Math.round(minutes / 15) * 15;
-
         if (roundedMinutes === 60) {
-          // 60分になった場合は時間を1繰り上げる
           const hours = parseInt(h, 10) + 1;
-          value = `${String(hours).padStart(2,'0')}:00`;
+          record[field] = `${String(hours).padStart(2,'0')}:00`;
         } else {
-          value = `${h}:${String(roundedMinutes).padStart(2, '0')}`;
+          record[field] = `${h}:${String(roundedMinutes).padStart(2, '0')}`;
         }
       }
     }
     
-    // 更新したレコードの値を設定
-    record[field] = value;
-    
-    // 更新したレコードで配列の該当インデックスを置き換える
     updatedRecords[dayIndex] = record;
-    // 親コンポーネント(App.jsx)に状態の変更を通知
     onWorkRecordsChange(updatedRecords);
   };
   
@@ -145,15 +145,11 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes); // ⑤作業時間
 
             // 行のCSSクラスを動的に決定
-            const isDayOff = (record.work_content || '').trim() === '休み';
-
-            const backgroundClass =
+            const rowClass =
               selectedRow === i ? 'bg-selected-yellow' : // 選択されている行
               isSunday || isHoliday ? 'bg-holiday-red' : // 日曜または祝日
               isSaturday ? 'bg-saturday-blue' : // 土曜
               ''; // 平日
-
-            const rowClass = `${backgroundClass} ${isDayOff ? 'holiday-border' : ''}`.trim();
 
             return (
               <tr key={day} className={rowClass} onClick={() => setSelectedRow(i)} onDoubleClick={() => onRowClick(record)}>
@@ -161,11 +157,15 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
                 <td className="border border-gray-300 p-1">{weekdays[dayOfWeek]}</td>
                 {/* 1列目の作業時間 (⑤と同じ) */}
                 <td className="border border-gray-300 p-1 bg-gray-100">{minutesToTime(actualWorkMinutes)}</td>
-                <td className="border border-gray-300 p-1 text-left">
+                <td className="border border-gray-300 p-1 text-left align-middle">
                   <textarea
                     value={record.work_content || ''}
                     onChange={(e) => handleInputChange(i, 'work_content', e.target.value)}
-                    className="w-full h-full p-1 border-none bg-transparent resize-none min-h-[40px]"
+                    className={
+                      (record.work_content || '').trim() === '休み'
+                        ? "rest-day-badge w-full text-center"
+                        : "w-full h-full p-1 border-none bg-transparent resize-none min-h-[40px]"
+                    }
                     rows="2"
                   />
                 </td>
