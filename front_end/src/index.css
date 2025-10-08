@@ -78,3 +78,8 @@ body {
     print-color-adjust: exact;
   }
 }
+
+/* 休みの日用の赤い罫線 */
+.holiday-border td {
+  border-color: red !important;
+}
