@@ -145,10 +145,21 @@ ${reportData.thoughts}`;
       );
   };
 
+  const actionButtons = (
+    <div className="flex justify-end space-x-4">
+      <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">キャンセル</button>
+      <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
+      <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+    </div>
+  );
+
   return (
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="日報入力">
       <div className="space-y-6">
-        <h2 className="text-xl font-bold text-center">日報入力 ({date})</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-center flex-grow">日報入力 ({date})</h2>
+          {actionButtons}
+        </div>
 
         <div className="mx-auto">
           {/* 時間入力 */}
@@ -185,9 +196,7 @@ ${reportData.thoughts}`;
         
         {/* ボタン */}
         <div className="flex justify-end space-x-4 pt-4">
-          <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">キャンセル</button>
-          <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-          <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+          {actionButtons}
         </div>
       </div>
     </Modal>
