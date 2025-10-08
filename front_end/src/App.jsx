@@ -229,6 +229,7 @@ function App() {
         isOpen={isDailyReportModalOpen}
         onRequestClose={() => setDailyReportModalOpen(false)}
         employeeId={selectedEmployeeId}
+        employeeName={selectedEmployee?.employee_name}
         date={selectedDateForDailyReport}
         // 選択された日付に該当する作業記録を探して渡す
         workRecord={workRecords.find(r => selectedDateForDailyReport && r.day === new Date(selectedDateForDailyReport).getDate())}
