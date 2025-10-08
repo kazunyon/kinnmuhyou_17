@@ -79,7 +79,12 @@ body {
   }
 }
 
-/* 休みの日用の赤い罫線 */
-.holiday-border td {
-  border-color: red !important;
+/* 休みの日用の赤いバッジスタイル */
+.rest-day-badge {
+  display: inline-block;
+  border: 1px solid red;
+  color: red;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: bold;
 }
