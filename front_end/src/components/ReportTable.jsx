@@ -145,11 +145,15 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes); // ⑤作業時間
 
             // 行のCSSクラスを動的に決定
-            const rowClass = 
+            const isDayOff = (record.work_content || '').trim() === '休み';
+
+            const backgroundClass =
               selectedRow === i ? 'bg-selected-yellow' : // 選択されている行
               isSunday || isHoliday ? 'bg-holiday-red' : // 日曜または祝日
               isSaturday ? 'bg-saturday-blue' : // 土曜
               ''; // 平日
+
+            const rowClass = `${backgroundClass} ${isDayOff ? 'holiday-border' : ''}`.trim();
 
             return (
               <tr key={day} className={rowClass} onClick={() => setSelectedRow(i)} onDoubleClick={() => onRowClick(record)}>
