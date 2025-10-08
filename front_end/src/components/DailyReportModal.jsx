@@ -15,7 +15,7 @@ const modalStyles = {
   },
 };
 
-const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord, onSave }) => {
+const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, date, workRecord, onSave }) => {
   const [reportData, setReportData] = useState({
     work_summary: '', problems: '', challenges: '', tomorrow_tasks: '', thoughts: ''
   });
@@ -98,6 +98,30 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
       alert("日報の保存に失敗しました。");
     }
   };
+
+  const handlePostReport = () => {
+    const postBody = `日報入力 (${date})
+氏名：${employeeName || ''}
+[作業内容]
+${reportData.work_summary}
+[問題点]
+${reportData.problems}
+[課題]
+${reportData.challenges}
+[明日する内容]
+${reportData.tomorrow_tasks}
+[所感]
+${reportData.thoughts}`;
+
+    navigator.clipboard.writeText(postBody)
+      .then(() => {
+        alert('日報がクリップボードにコピーされました。');
+      })
+      .catch(err => {
+        console.error('クリップボードへのコピーに失敗しました:', err);
+        alert('クリップボードへのコピーに失敗しました。');
+      });
+  };
   
   // 時間と分の選択肢を生成
   const hourOptions = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
@@ -162,6 +186,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, date, workRecord
         {/* ボタン */}
         <div className="flex justify-end space-x-4 pt-4">
           <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">キャンセル</button>
+          <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
           <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
         </div>
       </div>
