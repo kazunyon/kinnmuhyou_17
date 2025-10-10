@@ -28,7 +28,7 @@ function App() {
   const [companies, setCompanies] = useState([]); // 会社リスト
 
   // ユーザーの選択状態
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(1); // 選択中の社員ID
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(1); // ログインユーザーはID=1で固定
   const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1)); // 表示対象の年月 (初期値: 令和7年10月)
 
   // 表示データ
@@ -59,19 +59,15 @@ function App() {
    */
   useEffect(() => {
     const fetchInitialData = async () => {
-      setIsLoading(true);
+      // setIsLoading(true); // workrecord取得時にisLoadingがセットされるので不要
       try {
         // 社員リストと会社リストを並行して取得
         const [empRes, compRes] = await Promise.all([
-          axios.get(`${API_URL}/employees`),
+          axios.get(`${API_URL}/employees`), // マスターモーダル用に必要
           axios.get(`${API_URL}/companies`),
         ]);
         setEmployees(empRes.data);
         setCompanies(compRes.data);
-        // 社員リスト取得後、最初の社員を選択状態にする
-        if (empRes.data.length > 0) {
-          setSelectedEmployeeId(empRes.data[0].employee_id);
-        }
       } catch (error) {
         console.error("初期データの取得に失敗しました:", error);
         setMessage("サーバーとの通信に失敗しました。");
@@ -200,7 +196,6 @@ function App() {
       {/* メイン画面コンポーネント */}
       <ReportScreen
         // 表示用データ
-        employees={employees}
         selectedEmployee={selectedEmployee}
         company={company}
         currentDate={currentDate}
@@ -210,7 +205,6 @@ function App() {
         isLoading={isLoading}
         message={message}
         // イベントハンドラ (状態を変更する関数)
-        onEmployeeChange={(id) => setSelectedEmployeeId(parseInt(id))}
         onDateChange={setCurrentDate}
         onWorkRecordsChange={setWorkRecords}
         onSpecialNotesChange={setSpecialNotes}

@@ -40,8 +40,8 @@ const toJapaneseEra = (date) => {
  * @param {Function} props.onRowClick - テーブルの行がダブルクリックされたときのコールバック関数
  */
 const ReportScreen = ({
-  employees, selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
-  isLoading, message, onEmployeeChange, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
+  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
+  isLoading, message, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
   onSave, onPrint, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
@@ -116,15 +116,7 @@ const ReportScreen = ({
           <span className="inline-block w-14">部署</span>：{selectedEmployee?.department_name || ''}
         </div>
         <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
-          <span className="inline-block w-14">氏名</span>：
-          {/* 社員選択プルダウン */}
-          <select value={selectedEmployee?.employee_id || ''} onChange={(e) => onEmployeeChange(e.target.value)} className="ml-1 border-none bg-transparent">
-             {employees.map(emp => (
-               <option key={emp.employee_id} value={emp.employee_id}>
-                 {emp.employee_name}
-               </option>
-             ))}
-          </select>
+          <span className="inline-block w-14">氏名</span>：{selectedEmployee?.employee_name || ''}
         </div>
       </div>
 
