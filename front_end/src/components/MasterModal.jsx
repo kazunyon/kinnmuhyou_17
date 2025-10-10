@@ -20,15 +20,19 @@ const modalStyles = {
 // Modalのルート要素を設定
 Modal.setAppElement('#root');
 
-const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
+const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
   const [employees, setEmployees] = useState([]);
   const [masterUsers, setMasterUsers] = useState([]);
   const [newEmployee, setNewEmployee] = useState({
-      employee_name: '', department_name: '', employee_type: '正社員'
+      company_id: companies.length > 0 ? companies[0].company_id : '',
+      employee_name: '',
+      department_name: '',
+      employee_type: '正社員'
   });
 
   // 認証とUIの状態管理
   const [isLocked, setIsLocked] = useState(true);
+  const [isOwner, setIsOwner] = useState(false); // オーナー権限を持つか
   const [selectedMasterId, setSelectedMasterId] = useState('');
   const [password, setPassword] = useState('');
   // 各社員のパスワード変更用の一時的なstate
@@ -61,14 +65,20 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
     } else {
       // モーダルが閉じる時に状態をリセット
       setIsLocked(true);
+      setIsOwner(false);
       setPassword('');
       setSelectedMasterId('');
       setEmployees([]);
       setMasterUsers([]);
       setPasswordInputs({});
-      setNewEmployee({ employee_name: '', department_name: '', employee_type: '正社員' });
+      setNewEmployee({
+        company_id: companies.length > 0 ? companies[0].company_id : '',
+        employee_name: '',
+        department_name: '',
+        employee_type: '正社員'
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, companies]);
 
   const handleInputChange = (id, field, value) => {
     // チェックボックスの場合はboolean値に変換
@@ -94,12 +104,19 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
       return;
     }
     try {
-      await axios.post(`${API_URL}/master/authenticate`, {
+      const res = await axios.post(`${API_URL}/master/authenticate`, {
         employee_id: selectedMasterId,
         password: password
       });
-      alert('認証に成功しました。');
-      setIsLocked(false); // ロックを解除
+
+      if (res.data.is_owner) {
+        alert('オーナーとして認証しました。編集が可能です。');
+        setIsOwner(true);
+      } else {
+        alert('参照権限で認証しました。編集はできません。');
+        setIsOwner(false);
+      }
+      setIsLocked(false); // 認証後は認証エリアをロック
     } catch (error) {
       console.error("認証に失敗しました:", error);
       alert('認証に失敗しました。パスワードが正しいか確認してください。');
@@ -110,7 +127,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
     const passwordToUpdate = passwordInputs[employee.employee_id] || '';
     const dataToSend = {
       ...employee,
-      password: passwordToUpdate // パスワードが空でもAPI側で処理される
+      password: passwordToUpdate, // パスワードが空でもAPI側で処理される
+      owner_id: parseInt(selectedMasterId, 10) // オーナーとして認証したIDを送る
     };
 
     try {
@@ -123,7 +141,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
       setPasswordInputs(prev => ({...prev, [employee.employee_id]: ''}));
     } catch (error) {
       console.error("更新に失敗しました:", error);
-      alert('更新に失敗しました。');
+      const errorMessage = error.response?.data?.error || '更新に失敗しました。';
+      alert(errorMessage);
     }
   };
 
@@ -132,8 +151,12 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
         alert("氏名と部署名は必須です。");
         return;
     }
+    const dataToSend = {
+        ...newEmployee,
+        owner_id: parseInt(selectedMasterId, 10) // オーナーとして認証したIDを送る
+    };
     try {
-        await axios.post(`${API_URL}/employee`, newEmployee);
+        await axios.post(`${API_URL}/employee`, dataToSend);
         alert('新しい社員を追加しました。');
         // リストを再取得してモーダル内を更新
         const res = await axios.get(`${API_URL}/employees/all`);
@@ -145,7 +168,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
         setNewEmployee({ employee_name: '', department_name: '', employee_type: '正社員' });
     } catch (error) {
         console.error("追加に失敗しました:", error);
-        alert('追加に失敗しました。');
+        const errorMessage = error.response?.data?.error || '追加に失敗しました。';
+        alert(errorMessage);
     }
   };
 
@@ -156,7 +180,14 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
       {/* --- 認証エリア --- */}
       <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
         <fieldset disabled={!isLocked} className="flex items-center space-x-4">
-          <label htmlFor="master-user-select" className="font-semibold">マスターユーザー:</label>
+          <label className="font-semibold">ID :</label>
+          <input
+            type="text"
+            value={selectedMasterId}
+            disabled
+            className="p-2 border rounded bg-gray-200 w-16 text-center"
+          />
+          <label htmlFor="master-user-select" className="font-semibold">オーナー:</label>
           <select
             id="master-user-select"
             value={selectedMasterId}
@@ -174,64 +205,74 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="p-2 border rounded"
-            placeholder="パスワード"
+            placeholder="XXXXXX"
           />
-          <button onClick={handleAuthenticate} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400">
+          <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400">
             認証
           </button>
         </fieldset>
       </div>
 
       {/* --- 社員情報エリア --- */}
-      <fieldset disabled={isLocked} className="disabled:opacity-50">
+      <fieldset disabled={isLocked || !isOwner} className="disabled:opacity-50">
         <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-200 sticky top-0">
               <tr>
                 <th className="p-2 border">社員ID</th>
+                <th className="p-2 border">企業名</th>
                 <th className="p-2 border">部署名</th>
                 <th className="p-2 border">氏名</th>
                 <th className="p-2 border">社員区分</th>
-                <th className="p-2 border">退職</th>
+                <th className="p-2 border">退職フラグ</th>
                 <th className="p-2 border">マスター</th>
                 <th className="p-2 border">パスワード</th>
                 <th className="p-2 border">操作</th>
               </tr>
             </thead>
             <tbody>
-              {employees.map(emp => (
-                <tr key={emp.employee_id} className="hover:bg-gray-50">
-                  <td className="p-2 border">{emp.employee_id}</td>
-                  <td className="p-2 border">
-                    <input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" />
-                  </td>
-                  <td className="p-2 border">
-                    <input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" />
-                  </td>
-                  <td className="p-2 border">
-                     <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded">
-                          <option value="正社員">正社員</option>
-                          <option value="アルバイト">アルバイト</option>
-                          <option value="契約社員">契約社員</option>
-                     </select>
-                  </td>
-                  <td className="p-2 border text-center">
-                    <input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" />
-                  </td>
-                  <td className="p-2 border text-center">
-                    <input type="checkbox" checked={!!emp.master_flag} onChange={(e) => handleInputChange(emp.employee_id, 'master_flag', e.target.checked)} className="h-5 w-5" />
-                  </td>
-                  <td className="p-2 border">
-                     <input type="text" value={passwordInputs[emp.employee_id] || ''} onChange={(e) => handlePasswordInputChange(emp.employee_id, e.target.value)} className="w-full p-1 border rounded" placeholder="変更時のみ入力" />
-                  </td>
-                  <td className="p-2 border text-center">
-                    <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">更新</button>
-                  </td>
-                </tr>
-              ))}
+              {employees.map(emp => {
+                const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
+                return (
+                  <tr key={emp.employee_id} className="hover:bg-gray-50">
+                    <td className="p-2 border">{emp.employee_id}</td>
+                    <td className="p-2 border">{companyName}</td>
+                    <td className="p-2 border">
+                      <input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" />
+                    </td>
+                    <td className="p-2 border">
+                      <input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" />
+                    </td>
+                    <td className="p-2 border">
+                       <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded">
+                            <option value="正社員">正社員</option>
+                            <option value="アルバイト">アルバイト</option>
+                            <option value="契約社員">契約社員</option>
+                       </select>
+                    </td>
+                    <td className="p-2 border text-center">
+                      <input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" />
+                    </td>
+                    <td className="p-2 border text-center">
+                      <input type="checkbox" checked={!!emp.master_flag} onChange={(e) => handleInputChange(emp.employee_id, 'master_flag', e.target.checked)} className="h-5 w-5" />
+                    </td>
+                    <td className="p-2 border">
+                       <input type="text" value={passwordInputs[emp.employee_id] || ''} onChange={(e) => handlePasswordInputChange(emp.employee_id, e.target.value)} className="w-full p-1 border rounded" placeholder="変更時のみ入力" />
+                    </td>
+                    <td className="p-2 border text-center">
+                      <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">更新</button>
+                    </td>
+                  </tr>
+                )
+              })}
               {/* 新規社員の追加フォーム */}
               <tr className="bg-green-50">
                   <td className="p-2 border">新規</td>
+                  <td className="p-2 border">
+                    <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded">
+                      {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
+                    </select>
+                  </td>
                   <td className="p-2 border">
                       <input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" />
                   </td>

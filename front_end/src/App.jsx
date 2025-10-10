@@ -247,6 +247,7 @@ function App() {
         isOpen={isMasterModalOpen}
         onRequestClose={() => setMasterModalOpen(false)}
         onMasterUpdate={handleMasterUpdate}
+        companies={companies}
       />
 
       {/* 日報一覧モーダル */}

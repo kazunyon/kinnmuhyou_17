@@ -97,23 +97,22 @@ def close_db(exception):
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
     """
-    社員マスターから、退職者を除いた全社員のリストを取得する。
-    作業報告書画面で部署名などを表示するために、全情報（パスワードを除く）を返す。
+    作業報告書の氏名プルダウン用に、マスター権限を持つ在籍中の社員リストを取得する。
     Returns:
         Response: 社員オブジェクトのリストを含むJSONレスポンス。
     """
     try:
         db = get_db()
-        # retirement_flagが0 (在籍中) の社員の全カラムを取得
-        cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
+        # master_flagが1 (マスター) かつ retirement_flagが0 (在籍中) の社員を取得
+        cursor = db.execute('SELECT * FROM employees WHERE master_flag = 1 AND retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         # セキュリティのため、パスワードはレスポンスに含めない
         for emp in employees:
             emp.pop('password', None)
-        app.logger.info(f"{len(employees)}件の社員データを取得しました。")
+        app.logger.info(f"{len(employees)}件のマスター権限を持つ社員データを取得しました。")
         return jsonify(employees)
     except Exception as e:
-        app.logger.error(f"社員データ取得エラー: {e}")
+        app.logger.error(f"マスター社員データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/employees/all', methods=['GET'])
@@ -138,10 +137,11 @@ def get_all_employees():
 def authenticate_master():
     """
     マスターメンテナンスの認証を行う。
+    成功した場合、そのユーザーがオーナーかどうかのフラグも返す。
     Request Body (JSON):
         { "employee_id": int, "password": str }
     Returns:
-        Response: 認証成功/失敗のメッセージを含むJSONレスポンス。
+        Response: { "success": bool, "message": str, "is_owner": bool }
     """
     data = request.json
     employee_id = data.get('employee_id')
@@ -159,8 +159,14 @@ def authenticate_master():
         user = cursor.fetchone()
 
         if user and user['master_flag'] == 1 and user['password'] == password:
-            app.logger.info(f"マスター認証成功: 社員ID={employee_id}")
-            return jsonify({"success": True, "message": "認証に成功しました"}), 200
+            # オーナーは employee_id が 1 のユーザーとして定義
+            is_owner = (int(employee_id) == 1)
+            app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}")
+            return jsonify({
+                "success": True,
+                "message": "認証に成功しました",
+                "is_owner": is_owner
+            }), 200
         else:
             app.logger.warning(f"マスター認証失敗: 社員ID={employee_id}")
             return jsonify({"success": False, "message": "認証情報が正しくありません"}), 401
@@ -626,20 +632,23 @@ def save_daily_report():
 @app.route('/api/employee', methods=['POST'])
 def add_employee():
     """
-    マスターメンテナンス画面から新しい社員を追加する。
+    マスターメンテナンス画面から新しい社員を追加する。オーナー権限が必要。
 
     Request Body (JSON):
         {
+            "owner_id": 1, // オーナーのID
             "employee_name": str,
             "department_name": str,
-            "employee_type": str,
-            "company_id": int (optional)
+            ...
         }
-
-    Returns:
-        Response: 成功メッセージと新しい社員IDを含むJSONレスポンス。
     """
     data = request.json
+
+    # オーナー権限チェック
+    if data.get('owner_id') != 1:
+        app.logger.warning(f"社員追加API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
+        return jsonify({"error": "この操作を行う権限がありません"}), 403
+
     try:
         db = get_db()
         cursor = db.cursor()
@@ -664,10 +673,16 @@ def add_employee():
 @app.route('/api/employee/<int:employee_id>', methods=['PUT'])
 def update_employee(employee_id):
     """
-    マスターメンテナンス画面から既存の社員情報を更新する。
+    マスターメンテナンス画面から既存の社員情報を更新する。オーナー権限が必要。
     パスワードがリクエストに含まれ、かつ空文字列でない場合のみパスワードを更新する。
     """
     data = request.json
+
+    # オーナー権限チェック
+    if data.get('owner_id') != 1:
+        app.logger.warning(f"社員更新API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
+        return jsonify({"error": "この操作を行う権限がありません"}), 403
+
     try:
         db = get_db()
 
