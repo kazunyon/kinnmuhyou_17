@@ -97,15 +97,19 @@ def close_db(exception):
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
     """
-    社員マスターから、退職者を除いた全社員のリストを取得する。（ドロップダウン用）
+    社員マスターから、退職者を除いた全社員のリストを取得する。
+    作業報告書画面で部署名などを表示するために、全情報（パスワードを除く）を返す。
     Returns:
         Response: 社員オブジェクトのリストを含むJSONレスポンス。
     """
     try:
         db = get_db()
-        # retirement_flagが0 (在籍中) の社員のみを取得
-        cursor = db.execute('SELECT employee_id, employee_name FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
+        # retirement_flagが0 (在籍中) の社員の全カラムを取得
+        cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
+        # セキュリティのため、パスワードはレスポンスに含めない
+        for emp in employees:
+            emp.pop('password', None)
         app.logger.info(f"{len(employees)}件の社員データを取得しました。")
         return jsonify(employees)
     except Exception as e:
