@@ -32,31 +32,37 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
   // 認証とUIの状態管理
   const [isLocked, setIsLocked] = useState(true);
   const [isOwner, setIsOwner] = useState(false); // オーナー権限を持つか
-  const [authId, setAuthId] = useState(''); // 認証に使うID
+  const [ownerInfo, setOwnerInfo] = useState({ owner_id: '', owner_name: '' });
   const [password, setPassword] = useState('');
   // 各社員のパスワード変更用の一時的なstate
   const [passwordInputs, setPasswordInputs] = useState({});
 
   // モーダルが開かれた時にデータを取得する
   useEffect(() => {
-    const fetchAllEmployees = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axios.get(`${API_URL}/employees/all`);
-        setEmployees(res.data);
+        // オーナー情報を取得
+        const ownerRes = await axios.get(`${API_URL}/owner_info`);
+        setOwnerInfo(ownerRes.data);
+
+        // 全社員のリストを取得
+        const employeesRes = await axios.get(`${API_URL}/employees/all`);
+        setEmployees(employeesRes.data);
+
       } catch (error) {
-        console.error("社員データの取得に失敗しました:", error);
-        alert('社員データの取得に失敗しました。');
+        console.error("データの取得に失敗しました:", error);
+        alert('マスターデータの取得に失敗しました。');
       }
     };
 
     if (isOpen) {
-      fetchAllEmployees();
+      fetchData();
     } else {
       // モーダルが閉じる時に状態をリセット
       setIsLocked(true);
       setIsOwner(false);
       setPassword('');
-      setAuthId('');
+      setOwnerInfo({ owner_id: '', owner_name: '' });
       setEmployees([]);
       setPasswordInputs({});
       setNewEmployee({
@@ -87,13 +93,13 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
 
   // 認証処理
   const handleAuthenticate = async () => {
-    if (!authId || !password) {
-      alert('IDとパスワードを入力してください。');
+    if (!ownerInfo.owner_id || !password) {
+      alert('オーナー情報が読み込まれていないか、パスワードが入力されていません。');
       return;
     }
     try {
       const res = await axios.post(`${API_URL}/master/authenticate`, {
-        employee_id: authId,
+        employee_id: ownerInfo.owner_id,
         password: password
       });
 
@@ -130,7 +136,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     const dataToSend = {
       ...employee,
       password: passwordToUpdate,
-      owner_id: parseInt(authId, 10) // オーナーとして認証したIDを送る
+      owner_id: ownerInfo.owner_id // オーナーとして認証したIDを送る
     };
 
     try {
@@ -153,7 +159,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     }
     const dataToSend = {
         ...newEmployee,
-        owner_id: parseInt(authId, 10) // オーナーとして認証したIDを送る
+        owner_id: ownerInfo.owner_id // オーナーとして認証したIDを送る
     };
     try {
         await axios.post(`${API_URL}/employee`, dataToSend);
@@ -174,31 +180,42 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="マスターメンテナンス">
       <h2 className="text-xl font-bold text-center mb-6">マスターメンテナンス</h2>
 
-      {/* --- 認証エリア --- */}
+      {/* --- オーナー情報 & 認証エリア --- */}
       <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
-        <fieldset disabled={!isLocked} className="flex items-center space-x-4">
-          <label htmlFor="auth-id-input" className="font-semibold">ID :</label>
-          <input
-            id="auth-id-input"
-            type="text"
-            value={authId}
-            onChange={(e) => setAuthId(e.target.value)}
-            className="p-2 border rounded w-24"
-            placeholder="社員ID"
-          />
-          <label htmlFor="master-password-input" className="font-semibold">パスワード:</label>
-          <input
-            id="master-password-input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="p-2 border rounded"
-            placeholder="XXXXXX"
-          />
-          <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400">
-            認証
-          </button>
-        </fieldset>
+          <h3 className="text-lg font-semibold mb-3">オーナー情報</h3>
+          <fieldset disabled={!isLocked} className="flex items-center space-x-4">
+              <span className="font-semibold">ID :</span>
+              <input
+                  type="text"
+                  value={ownerInfo.owner_id}
+                  disabled
+                  className="p-2 border rounded w-20 bg-gray-200"
+              />
+              <span className="font-semibold">オーナー氏名:</span>
+              {/* ドロップダウンに見えるが、実際は選択不可のテキストフィールド */}
+              <div className="relative">
+                  <input
+                      type="text"
+                      value={ownerInfo.owner_name}
+                      disabled
+                      className="p-2 border rounded w-48 bg-gray-200 appearance-none"
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                      <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                  </div>
+              </div>
+              <span className="font-semibold">パスワード:</span>
+              <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="p-2 border rounded"
+                  placeholder="XXXXXX"
+              />
+              <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400">
+                  認証
+              </button>
+          </fieldset>
       </div>
 
       {/* --- 社員情報エリア --- */}

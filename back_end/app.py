@@ -160,8 +160,9 @@ def authenticate_master():
 
         if user and user['password'] == password:
             is_master = user['master_flag'] == 1
-            # オーナーは employee_id が 1 のユーザーとして定義
-            is_owner = is_master and (int(employee_id) == 1)
+            # オーナーIDをファイルから取得
+            owner_id = get_owner_id()
+            is_owner = is_master and (int(employee_id) == owner_id)
 
             if not is_master:
                 app.logger.warning(f"認証試行（マスター権限なし）: 社員ID={employee_id}")
@@ -636,6 +637,35 @@ def save_daily_report():
 # -----------------------------------------------------------------------------
 # APIエンドポイント: 社員マスターメンテナンス
 # -----------------------------------------------------------------------------
+def get_owner_id():
+    """num.idファイルからオーナーのIDを読み込む"""
+    try:
+        # num.idファイルの絶対パスを構築
+        num_id_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'num.id')
+        with open(num_id_path, 'r') as f:
+            owner_id = int(f.read().strip())
+            app.logger.info(f"オーナーID ({owner_id}) を num.id から読み込みました。")
+            return owner_id
+    except (FileNotFoundError, ValueError) as e:
+        app.logger.error(f"num.idファイルの読み込みに失敗しました: {e}")
+        # ファイルがない、または内容が不正な場合は、フォールバックとしてID=1を返す
+        return 1
+
+@app.route('/api/owner_info', methods=['GET'])
+def get_owner_info():
+    """オーナーのIDと氏名を取得する"""
+    try:
+        owner_id = get_owner_id()
+        db = get_db()
+        cursor = db.execute('SELECT employee_name FROM employees WHERE employee_id = ?', (owner_id,))
+        owner = cursor.fetchone()
+        if owner:
+            return jsonify({"owner_id": owner_id, "owner_name": owner['employee_name']})
+        else:
+            return jsonify({"error": "オーナー情報が見つかりません"}), 404
+    except Exception as e:
+        app.logger.error(f"オーナー情報取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/employee', methods=['POST'])
 def add_employee():
@@ -644,16 +674,17 @@ def add_employee():
 
     Request Body (JSON):
         {
-            "owner_id": 1, // オーナーのID
+            "owner_id": int, // オーナーのID
             "employee_name": str,
             "department_name": str,
             ...
         }
     """
     data = request.json
+    owner_id = get_owner_id()
 
     # オーナー権限チェック
-    if data.get('owner_id') != 1:
+    if data.get('owner_id') != owner_id:
         app.logger.warning(f"社員追加API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
@@ -685,9 +716,10 @@ def update_employee(employee_id):
     パスワードがリクエストに含まれ、かつ空文字列でない場合のみパスワードを更新する。
     """
     data = request.json
+    owner_id = get_owner_id()
 
     # オーナー権限チェック
-    if data.get('owner_id') != 1:
+    if data.get('owner_id') != owner_id:
         app.logger.warning(f"社員更新API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
