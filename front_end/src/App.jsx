@@ -246,7 +246,6 @@ function App() {
       <MasterModal
         isOpen={isMasterModalOpen}
         onRequestClose={() => setMasterModalOpen(false)}
-        employees={employees}
         onMasterUpdate={handleMasterUpdate}
       />
 

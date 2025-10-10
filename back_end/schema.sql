@@ -22,6 +22,8 @@ CREATE TABLE employees (
     department_name TEXT,
     employee_type TEXT, -- '正社員', 'アルバイト'など
     retirement_flag INTEGER NOT NULL DEFAULT 0, -- 0:在職, 1:退職
+    master_flag INTEGER NOT NULL DEFAULT 0, -- 0:一般, 1:マスター
+    password TEXT, -- マスターユーザーのパスワード
     FOREIGN KEY (company_id) REFERENCES companies (company_id)
 );
 

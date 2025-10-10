@@ -34,12 +34,19 @@ def init_db():
         print("会社マスターに初期データを挿入しました。")
 
         # 社員マスター
+        # パスワードはハッシュ化して保存するのがベストプラクティスですが、今回は簡単のため平文で保存します。
         employees_data = [
-            (1, 1, '中村　一真', '開発部', '正社員', 0),
-            (2, 1, '筑紫　哲也', '研究部', '正社員', 0)
+            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
+            (1, 1, '中村　一真', '開発部', 'アルバイト', 0, 1, '123'),
+            (2, 1, '筑紫　哲也', '研究部', '正社員', 0, 0, None),
+            (3, 1, '営業　よろしく', '営業部', '正社員', 0, 1, '123'),
+            (4, 1, '高市　早苗', '開発部', '正社員', 0, 0, None)
         ]
-        cursor.executemany("INSERT INTO employees (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag) VALUES (?, ?, ?, ?, ?, ?)",
-                           employees_data)
+        cursor.executemany("""
+            INSERT INTO employees
+            (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, employees_data)
         print("社員マスターに初期データを挿入しました。")
         
         # 祝日マスター (2025年〜2027年)

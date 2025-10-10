@@ -97,21 +97,72 @@ def close_db(exception):
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
     """
-    社員マスターから、退職者を除いた全社員のリストを取得する。
-
+    社員マスターから、退職者を除いた全社員のリストを取得する。（ドロップダウン用）
     Returns:
         Response: 社員オブジェクトのリストを含むJSONレスポンス。
-                  例: [{"employee_id": 1, "employee_name": "山田太郎"}, ...]
     """
     try:
         db = get_db()
         # retirement_flagが0 (在籍中) の社員のみを取得
-        cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0')
+        cursor = db.execute('SELECT employee_id, employee_name FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         app.logger.info(f"{len(employees)}件の社員データを取得しました。")
         return jsonify(employees)
     except Exception as e:
         app.logger.error(f"社員データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/employees/all', methods=['GET'])
+def get_all_employees():
+    """
+    マスターメンテナンス用に、全社員のリストを取得する。（パスワードは含まない）
+    Returns:
+        Response: 社員オブジェクトのリストを含むJSONレスポンス。
+    """
+    try:
+        db = get_db()
+        # パスワードを除いた全カラムを取得
+        cursor = db.execute('SELECT employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag FROM employees ORDER BY employee_id')
+        employees = [dict(row) for row in cursor.fetchall()]
+        app.logger.info(f"全社員データ（マスター用）を{len(employees)}件取得しました。")
+        return jsonify(employees)
+    except Exception as e:
+        app.logger.error(f"全社員データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/master/authenticate', methods=['POST'])
+def authenticate_master():
+    """
+    マスターメンテナンスの認証を行う。
+    Request Body (JSON):
+        { "employee_id": int, "password": str }
+    Returns:
+        Response: 認証成功/失敗のメッセージを含むJSONレスポンス。
+    """
+    data = request.json
+    employee_id = data.get('employee_id')
+    password = data.get('password')
+
+    if not employee_id or not password:
+        return jsonify({"error": "IDとパスワードは必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute(
+            'SELECT password, master_flag FROM employees WHERE employee_id = ?',
+            (employee_id,)
+        )
+        user = cursor.fetchone()
+
+        if user and user['master_flag'] == 1 and user['password'] == password:
+            app.logger.info(f"マスター認証成功: 社員ID={employee_id}")
+            return jsonify({"success": True, "message": "認証に成功しました"}), 200
+        else:
+            app.logger.warning(f"マスター認証失敗: 社員ID={employee_id}")
+            return jsonify({"success": False, "message": "認証情報が正しくありません"}), 401
+
+    except Exception as e:
+        app.logger.error(f"マスター認証エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/companies', methods=['GET'])
@@ -610,38 +661,46 @@ def add_employee():
 def update_employee(employee_id):
     """
     マスターメンテナンス画面から既存の社員情報を更新する。
-
-    Args:
-        employee_id (int): 更新対象の社員ID。
-
-    Request Body (JSON):
-        {
-            "employee_name": str,
-            "department_name": str,
-            "employee_type": str,
-            "retirement_flag": bool
-        }
-
-    Returns:
-        Response: 成功メッセージを含むJSONレスポンス。
+    パスワードがリクエストに含まれ、かつ空文字列でない場合のみパスワードを更新する。
     """
     data = request.json
     try:
         db = get_db()
-        cursor = db.cursor()
-        cursor.execute("""
-            UPDATE employees SET
-            employee_name = ?, department_name = ?, employee_type = ?, retirement_flag = ?
-            WHERE employee_id = ?
-        """, (
-            data.get('employee_name'),
-            data.get('department_name'),
-            data.get('employee_type'),
-            1 if data.get('retirement_flag') else 0, # boolをintに変換
-            employee_id
-        ))
+
+        # パスワードが提供され、空文字列でない場合のみ更新する
+        if data.get('password'):
+            db.execute("""
+                UPDATE employees SET
+                employee_name = ?, department_name = ?, employee_type = ?,
+                retirement_flag = ?, master_flag = ?, password = ?
+                WHERE employee_id = ?
+            """, (
+                data.get('employee_name'),
+                data.get('department_name'),
+                data.get('employee_type'),
+                1 if data.get('retirement_flag') else 0,
+                1 if data.get('master_flag') else 0,
+                data.get('password'),
+                employee_id
+            ))
+            app.logger.info(f"社員情報（パスワードを含む）を更新しました: ID={employee_id}")
+        else: # パスワードを更新しない場合
+            db.execute("""
+                UPDATE employees SET
+                employee_name = ?, department_name = ?, employee_type = ?,
+                retirement_flag = ?, master_flag = ?
+                WHERE employee_id = ?
+            """, (
+                data.get('employee_name'),
+                data.get('department_name'),
+                data.get('employee_type'),
+                1 if data.get('retirement_flag') else 0,
+                1 if data.get('master_flag') else 0,
+                employee_id
+            ))
+            app.logger.info(f"社員情報（パスワードを除く）を更新しました: ID={employee_id}")
+
         db.commit()
-        app.logger.info(f"社員情報更新成功: ID={employee_id}")
         return jsonify({"message": "社員情報を更新しました"}), 200
     except Exception as e:
         db.rollback()
