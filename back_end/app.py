@@ -158,13 +158,21 @@ def authenticate_master():
         )
         user = cursor.fetchone()
 
-        if user and user['master_flag'] == 1 and user['password'] == password:
+        if user and user['password'] == password:
+            is_master = user['master_flag'] == 1
             # オーナーは employee_id が 1 のユーザーとして定義
-            is_owner = (int(employee_id) == 1)
+            is_owner = is_master and (int(employee_id) == 1)
+
+            if not is_master:
+                app.logger.warning(f"認証試行（マスター権限なし）: 社員ID={employee_id}")
+                # is_master: false を返すことで、フロント側で制御できるようにする
+                return jsonify({"success": True, "is_master": False, "is_owner": False}), 200
+
             app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}")
             return jsonify({
                 "success": True,
                 "message": "認証に成功しました",
+                "is_master": True,
                 "is_owner": is_owner
             }), 200
         else:

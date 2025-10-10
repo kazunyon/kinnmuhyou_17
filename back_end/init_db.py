@@ -35,18 +35,25 @@ def init_db():
 
         # 社員マスター
         # パスワードはハッシュ化して保存するのがベストプラクティスですが、今回は簡単のため平文で保存します。
-        employees_data = [
-            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
-            (1, 1, '中村　一真', '開発部', 'アルバイト', 0, 1, '123'),
-            (2, 1, '筑紫　哲也', '研究部', '正社員', 0, 0, None),
-            (3, 1, '営業　よろしく', '営業部', '正社員', 0, 1, '123'),
-            (4, 1, '高市　早苗', '開発部', '正社員', 0, 0, None)
+        # master_flagが1のユーザーには初期パスワード'123'を設定します。
+        employees_definitions = [
+            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag)
+            (1, 1, '中村　一真', '開発部', 'アルバイト', 0, 1),
+            (2, 1, '筑紫　哲也', '研究部', '正社員', 0, 0),
+            (3, 1, '営業　よろしく', '営業部', '正社員', 0, 1),
+            (4, 1, '高市　早苗', '開発部', '正社員', 0, 0)
         ]
+
+        employees_data_to_insert = []
+        for emp in employees_definitions:
+            password = '123' if emp[6] == 1 else None
+            employees_data_to_insert.append(emp + (password,))
+
         cursor.executemany("""
             INSERT INTO employees
             (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, employees_data)
+            """, employees_data_to_insert)
         print("社員マスターに初期データを挿入しました。")
         
         # 祝日マスター (2025年〜2027年)

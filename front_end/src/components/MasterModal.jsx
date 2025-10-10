@@ -22,7 +22,6 @@ Modal.setAppElement('#root');
 
 const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
   const [employees, setEmployees] = useState([]);
-  const [masterUsers, setMasterUsers] = useState([]);
   const [newEmployee, setNewEmployee] = useState({
       company_id: companies.length > 0 ? companies[0].company_id : '',
       employee_name: '',
@@ -33,7 +32,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
   // 認証とUIの状態管理
   const [isLocked, setIsLocked] = useState(true);
   const [isOwner, setIsOwner] = useState(false); // オーナー権限を持つか
-  const [selectedMasterId, setSelectedMasterId] = useState('');
+  const [authId, setAuthId] = useState(''); // 認証に使うID
   const [password, setPassword] = useState('');
   // 各社員のパスワード変更用の一時的なstate
   const [passwordInputs, setPasswordInputs] = useState({});
@@ -43,17 +42,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     const fetchAllEmployees = async () => {
       try {
         const res = await axios.get(`${API_URL}/employees/all`);
-        const allEmps = res.data;
-        setEmployees(allEmps);
-
-        // マスター権限を持つユーザーを抽出
-        const masters = allEmps.filter(emp => emp.master_flag);
-        setMasterUsers(masters);
-
-        // マスターユーザーがいれば、選択肢のデフォルト値を設定
-        if (masters.length > 0) {
-          setSelectedMasterId(masters[0].employee_id);
-        }
+        setEmployees(res.data);
       } catch (error) {
         console.error("社員データの取得に失敗しました:", error);
         alert('社員データの取得に失敗しました。');
@@ -67,9 +56,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
       setIsLocked(true);
       setIsOwner(false);
       setPassword('');
-      setSelectedMasterId('');
+      setAuthId('');
       setEmployees([]);
-      setMasterUsers([]);
       setPasswordInputs({});
       setNewEmployee({
         company_id: companies.length > 0 ? companies[0].company_id : '',
@@ -99,15 +87,28 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
 
   // 認証処理
   const handleAuthenticate = async () => {
-    if (!selectedMasterId || !password) {
-      alert('マスターユーザーを選択し、パスワードを入力してください。');
+    if (!authId || !password) {
+      alert('IDとパスワードを入力してください。');
       return;
     }
     try {
       const res = await axios.post(`${API_URL}/master/authenticate`, {
-        employee_id: selectedMasterId,
+        employee_id: authId,
         password: password
       });
+
+      if (res.data.success === false) {
+        alert(res.data.message || 'IDまたはパスワードが正しくありません。');
+        return;
+      }
+
+      // master_flagがないユーザーは弾く
+      if (res.data.is_master === false) {
+        alert('マスターメンテナンスを行う権限がありません。');
+        // モーダルを閉じるか、UIをロックしたままにする
+        // ここでは何もしない（ユーザーがID/PWを再入力できるようにする）
+        return;
+      }
 
       if (res.data.is_owner) {
         alert('オーナーとして認証しました。編集が可能です。');
@@ -116,10 +117,11 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
         alert('参照権限で認証しました。編集はできません。');
         setIsOwner(false);
       }
-      setIsLocked(false); // 認証後は認証エリアをロック
+      setIsLocked(false); // 認証後はUIをロック解除（ただしオーナーでないと編集不可）
     } catch (error) {
-      console.error("認証に失敗しました:", error);
-      alert('認証に失敗しました。パスワードが正しいか確認してください。');
+      console.error("認証処理中にエラーが発生しました:", error);
+      const errorMessage = error.response?.data?.message || '認証中にサーバーエラーが発生しました。';
+      alert(errorMessage);
     }
   };
 
@@ -127,17 +129,15 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     const passwordToUpdate = passwordInputs[employee.employee_id] || '';
     const dataToSend = {
       ...employee,
-      password: passwordToUpdate, // パスワードが空でもAPI側で処理される
-      owner_id: parseInt(selectedMasterId, 10) // オーナーとして認証したIDを送る
+      password: passwordToUpdate,
+      owner_id: parseInt(authId, 10) // オーナーとして認証したIDを送る
     };
 
     try {
       await axios.put(`${API_URL}/employee/${employee.employee_id}`, dataToSend);
       alert('社員情報を更新しました。');
-      // 親コンポーネントのドロップダウンリストを更新
       const res = await axios.get(`${API_URL}/employees`);
       onMasterUpdate(res.data);
-      // パスワード入力フィールドをクリア
       setPasswordInputs(prev => ({...prev, [employee.employee_id]: ''}));
     } catch (error) {
       console.error("更新に失敗しました:", error);
@@ -153,19 +153,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
     }
     const dataToSend = {
         ...newEmployee,
-        owner_id: parseInt(selectedMasterId, 10) // オーナーとして認証したIDを送る
+        owner_id: parseInt(authId, 10) // オーナーとして認証したIDを送る
     };
     try {
         await axios.post(`${API_URL}/employee`, dataToSend);
         alert('新しい社員を追加しました。');
-        // リストを再取得してモーダル内を更新
         const res = await axios.get(`${API_URL}/employees/all`);
         setEmployees(res.data);
-        // 親コンポーネントのドロップダウンリストも更新
         const resForParent = await axios.get(`${API_URL}/employees`);
         onMasterUpdate(resForParent.data);
-        // 新規入力フォームをリセット
-        setNewEmployee({ employee_name: '', department_name: '', employee_type: '正社員' });
+        setNewEmployee({ ...newEmployee, employee_name: '', department_name: '' });
     } catch (error) {
         console.error("追加に失敗しました:", error);
         const errorMessage = error.response?.data?.error || '追加に失敗しました。';
@@ -180,24 +177,15 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
       {/* --- 認証エリア --- */}
       <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
         <fieldset disabled={!isLocked} className="flex items-center space-x-4">
-          <label className="font-semibold">ID :</label>
+          <label htmlFor="auth-id-input" className="font-semibold">ID :</label>
           <input
+            id="auth-id-input"
             type="text"
-            value={selectedMasterId}
-            disabled
-            className="p-2 border rounded bg-gray-200 w-16 text-center"
+            value={authId}
+            onChange={(e) => setAuthId(e.target.value)}
+            className="p-2 border rounded w-24"
+            placeholder="社員ID"
           />
-          <label htmlFor="master-user-select" className="font-semibold">オーナー:</label>
-          <select
-            id="master-user-select"
-            value={selectedMasterId}
-            onChange={(e) => setSelectedMasterId(e.target.value)}
-            className="p-2 border rounded"
-          >
-            {masterUsers.map(user => (
-              <option key={user.employee_id} value={user.employee_id}>{user.employee_name}</option>
-            ))}
-          </select>
           <label htmlFor="master-password-input" className="font-semibold">パスワード:</label>
           <input
             id="master-password-input"
