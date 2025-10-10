@@ -4,6 +4,7 @@ __pycache__/
 back_end/venv/
 venv/
 */venv/
+front_end/dist
 
 # Logs
 *.log
