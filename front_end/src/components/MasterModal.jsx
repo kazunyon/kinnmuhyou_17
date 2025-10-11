@@ -53,7 +53,6 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     };
 
     if (isOpen) {
-    if (isOpen) {
       fetchData();
     } else {
       // モーダルが閉じる時は、パスワード入力フィールドと、取得したデータをリセット
