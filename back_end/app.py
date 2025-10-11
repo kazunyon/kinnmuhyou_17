@@ -6,6 +6,13 @@ import calendar
 from flask import Flask, jsonify, request, g, send_from_directory
 from flask_cors import CORS
 import sqlite3
+import uuid
+from functools import wraps
+
+# --- グローバル変数 ---
+# サーバーメモリ上で認証済みセッションを管理
+# 本番環境ではRedisやデータベースなど、より永続的でスケーラブルなストアを検討すべき
+sessions = {}
 
 # 外部の勤怠計算モジュールをインポート
 from attendance_calculator import AttendanceCalculator
@@ -169,12 +176,17 @@ def authenticate_master():
                 # is_master: false を返すことで、フロント側で制御できるようにする
                 return jsonify({"success": True, "is_master": False, "is_owner": False}), 200
 
-            app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}")
+            # トークンを生成し、セッション情報を保存
+            token = str(uuid.uuid4())
+            sessions[token] = {"employee_id": employee_id, "is_owner": is_owner}
+            app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}, トークン発行")
+
             return jsonify({
                 "success": True,
                 "message": "認証に成功しました",
                 "is_master": True,
-                "is_owner": is_owner
+                "is_owner": is_owner,
+                "token": token  # トークンをレスポンスに含める
             }), 200
         else:
             app.logger.warning(f"マスター認証失敗: 社員ID={employee_id}")
@@ -668,6 +680,7 @@ def get_owner_info():
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/employee', methods=['POST'])
+@owner_required
 def add_employee():
     """
     マスターメンテナンス画面から新しい社員を追加する。オーナー権限が必要。
@@ -675,18 +688,13 @@ def add_employee():
     Request Body (JSON):
         {
             "owner_id": int, // オーナーのID
+            "owner_password": str, // オーナーのパスワード
             "employee_name": str,
             "department_name": str,
             ...
         }
     """
     data = request.json
-    owner_id = get_owner_id()
-
-    # オーナー権限チェック
-    if data.get('owner_id') != owner_id:
-        app.logger.warning(f"社員追加API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
-        return jsonify({"error": "この操作を行う権限がありません"}), 403
 
     try:
         db = get_db()
@@ -709,19 +717,39 @@ def add_employee():
         app.logger.error(f"社員追加エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+def owner_required(f):
+    """オーナー権限を要求するAPIルートを保護するデコレータ"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
+            token = request.headers['Authorization'].split(' ')[1]
+
+        if not token:
+            app.logger.warning("権限チェック: トークンがありません。")
+            return jsonify({"error": "認証トークンが必要です"}), 401
+
+        session = sessions.get(token)
+        if not session:
+            app.logger.warning(f"権限チェック: 無効なトークンです。token={token}")
+            return jsonify({"error": "無効な認証トークンです"}), 401
+
+        if not session.get('is_owner'):
+            app.logger.warning(f"権限チェック: オーナー権限がありません。token={token}")
+            return jsonify({"error": "この操作を行う権限がありません"}), 403
+
+        # 認証成功、元の関数を実行
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/api/employee/<int:employee_id>', methods=['PUT'])
+@owner_required
 def update_employee(employee_id):
     """
     マスターメンテナンス画面から既存の社員情報を更新する。オーナー権限が必要。
     パスワードがリクエストに含まれ、かつ空文字列でない場合のみパスワードを更新する。
     """
     data = request.json
-    owner_id = get_owner_id()
-
-    # オーナー権限チェック
-    if data.get('owner_id') != owner_id:
-        app.logger.warning(f"社員更新API: 権限のないアクセス試行。owner_id={data.get('owner_id')}")
-        return jsonify({"error": "この操作を行う権限がありません"}), 403
 
     try:
         db = get_db()
