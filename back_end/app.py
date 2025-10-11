@@ -307,6 +307,13 @@ def save_work_records():
         app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
+    # --- 権限チェック ---
+    # オーナーのIDを取得し、リクエストされたemployee_idがオーナーであるか検証
+    owner_id = get_owner_id()
+    if employee_id != owner_id:
+        app.logger.warning(f"権限のない作業記録保存試行: 操作対象ID={employee_id}, オーナーID={owner_id}")
+        return jsonify({"error": "作業記録を更新する権限がありません。"}), 403
+
     db = get_db()
     try:
         # トランザクション開始

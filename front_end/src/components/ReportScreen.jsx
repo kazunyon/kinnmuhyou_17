@@ -41,7 +41,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
-  isLoading, message, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
+  isLoading, message, isReadOnly, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
   onSave, onPrint, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
@@ -102,7 +102,13 @@ const ReportScreen = ({
             {message && <div className="text-green-600 mr-4">{message}</div>}
             <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
             <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
-            <button onClick={onSave} className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-500">保存</button>
+            <button
+              onClick={onSave}
+              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-500'}`}
+              disabled={isReadOnly}
+            >
+              保存
+            </button>
             <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
         </div>
       </header>
@@ -130,6 +136,7 @@ const ReportScreen = ({
           holidays={holidays}
           onWorkRecordsChange={onWorkRecordsChange}
           onRowClick={onRowClick}
+          isReadOnly={isReadOnly}
         />
       )}
       
@@ -140,8 +147,9 @@ const ReportScreen = ({
           value={specialNotes}
           onChange={(e) => onSpecialNotesChange(e.target.value)}
           rows="5"
-          className="w-full p-2 border rounded"
-          placeholder="この月の特記事項を入力してください..."
+          className={`w-full p-2 border rounded ${isReadOnly ? 'bg-gray-100' : ''}`}
+          placeholder={isReadOnly ? "オーナーのみ編集可能です。" : "この月の特記事項を入力してください..."}
+          readOnly={isReadOnly}
         ></textarea>
       </div>
     </div>

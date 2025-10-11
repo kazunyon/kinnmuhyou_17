@@ -11,7 +11,7 @@ import { getDay, format } from 'date-fns';
  * @param {Function} props.onWorkRecordsChange - 作業記録データが変更されたときのコールバック関数
  * @param {Function} props.onRowClick - テーブルの行がダブルクリックされたときのコールバック関数
  */
-const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, onRowClick }) => {
+const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, onRowClick, isReadOnly }) => {
   // クリックで選択された行のインデックスを管理するstate
   const [selectedRow, setSelectedRow] = useState(null);
   
@@ -162,11 +162,12 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
                     value={record.work_content || ''}
                     onChange={(e) => handleInputChange(i, 'work_content', e.target.value)}
                     className={
-                      (record.work_content || '').trim() === '休み'
-                        ? "rest-day-badge w-full text-center"
-                        : "w-full h-full p-1 border-none bg-transparent resize-none min-h-[40px]"
+                      `w-full h-full p-1 border-none resize-none min-h-[40px] ` +
+                      ((record.work_content || '').trim() === '休み' ? "rest-day-badge text-center" : "bg-transparent") +
+                      (isReadOnly ? ' bg-gray-100' : '')
                     }
                     rows="2"
+                    readOnly={isReadOnly}
                   />
                 </td>
                 <td className="border border-gray-300 p-1">
@@ -175,7 +176,8 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
                     step="900" // HTML5の機能で15分(900秒)刻みの入力UIを提供
                     value={record.start_time || ''}
                     onChange={(e) => handleInputChange(i, 'start_time', e.target.value)}
-                    className="w-full p-1 border-none bg-transparent"
+                    className={`w-full p-1 border-none bg-transparent ${isReadOnly ? 'bg-gray-100' : ''}`}
+                    readOnly={isReadOnly}
                   />
                 </td>
                 <td className="border border-gray-300 p-1">
@@ -184,7 +186,8 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
                     step="900"
                     value={record.end_time || ''}
                     onChange={(e) => handleInputChange(i, 'end_time', e.target.value)}
-                    className="w-full p-1 border-none bg-transparent"
+                    className={`w-full p-1 border-none bg-transparent ${isReadOnly ? 'bg-gray-100' : ''}`}
+                    readOnly={isReadOnly}
                   />
                 </td>
                 {/* ③勤務時間 (自動計算・表示のみ) */}
@@ -195,7 +198,8 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
                     step="900"
                     value={record.break_time || '00:00'}
                     onChange={(e) => handleInputChange(i, 'break_time', e.target.value)}
-                    className="w-full p-1 border-none bg-transparent"
+                    className={`w-full p-1 border-none bg-transparent ${isReadOnly ? 'bg-gray-100' : ''}`}
+                    readOnly={isReadOnly}
                   />
                 </td>
                 {/* ⑤作業時間 (自動計算・表示のみ) */}

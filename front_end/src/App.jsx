@@ -39,6 +39,8 @@ function App() {
   // UIの状態
   const [isLoading, setIsLoading] = useState(true); // データ読み込み中のフラグ
   const [message, setMessage] = useState(''); // 保存成功時などに表示するメッセージ
+  const [ownerId, setOwnerId] = useState(null); // オーナーのID
+  const [isViewingOwnerReport, setIsViewingOwnerReport] = useState(false); // 表示中のレポートがオーナーのものか
   
   // モーダルウィンドウの開閉状態
   const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false); // 日報入力モーダル
@@ -66,6 +68,10 @@ function App() {
           axios.get(`${API_URL}/employees`), // マスターモーダル用に必要
           axios.get(`${API_URL}/companies`),
         ]);
+        // オーナー情報を取得
+        const ownerRes = await axios.get(`${API_URL}/owner_info`);
+        setOwnerId(ownerRes.data.owner_id);
+
         setEmployees(empRes.data);
         setCompanies(compRes.data);
       } catch (error) {
@@ -75,6 +81,16 @@ function App() {
     };
     fetchInitialData();
   }, []); // 空の依存配列は、マウント時に一度だけ実行されることを意味する
+
+  /**
+   * 選択中の社員IDまたはオーナーIDが変更されたときに実行される。
+   * 表示中の作業報告書がオーナーのものであるかを判定する。
+   */
+  useEffect(() => {
+    if (ownerId !== null) {
+      setIsViewingOwnerReport(selectedEmployeeId === ownerId);
+    }
+  }, [selectedEmployeeId, ownerId]);
 
   /**
    * 選択中の社員ID (selectedEmployeeId) または年月 (currentDate) が変更されたときに実行される。
@@ -213,6 +229,7 @@ function App() {
         specialNotes={specialNotes}
         isLoading={isLoading}
         message={message}
+        isReadOnly={!isViewingOwnerReport}
         // イベントハンドラ (状態を変更する関数)
         onDateChange={setCurrentDate}
         onWorkRecordsChange={setWorkRecords}
