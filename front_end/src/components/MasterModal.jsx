@@ -20,7 +20,7 @@ const modalStyles = {
 // Modalのルート要素を設定
 Modal.setAppElement('#root');
 
-const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
+const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, companies }) => {
   const [employees, setEmployees] = useState([]);
   const [newEmployee, setNewEmployee] = useState({
       company_id: companies.length > 0 ? companies[0].company_id : '',
@@ -219,7 +219,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
       </div>
 
       {/* --- 社員情報エリア --- */}
-      <fieldset disabled={isLocked || !isOwner} className="disabled:opacity-50">
+      <fieldset disabled={isLocked} className="disabled:opacity-50">
         <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-200 sticky top-0">
@@ -231,7 +231,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
                 <th className="p-2 border">社員区分</th>
                 <th className="p-2 border">退職フラグ</th>
                 <th className="p-2 border">マスター</th>
-                <th className="p-2 border">パスワード</th>
+                {isOwner && <th className="p-2 border">パスワード</th>}
+                <th className="p-2 border">参照</th>
                 <th className="p-2 border">操作</th>
               </tr>
             </thead>
@@ -243,29 +244,40 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
                     <td className="p-2 border">{emp.employee_id}</td>
                     <td className="p-2 border">{companyName}</td>
                     <td className="p-2 border">
-                      <input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" />
+                      <input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!isOwner} />
                     </td>
                     <td className="p-2 border">
-                      <input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" />
+                      <input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" disabled={!isOwner} />
                     </td>
                     <td className="p-2 border">
-                       <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded">
+                       <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!isOwner}>
                             <option value="正社員">正社員</option>
                             <option value="アルバイト">アルバイト</option>
                             <option value="契約社員">契約社員</option>
                        </select>
                     </td>
                     <td className="p-2 border text-center">
-                      <input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" />
+                      <input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" disabled={!isOwner} />
                     </td>
                     <td className="p-2 border text-center">
-                      <input type="checkbox" checked={!!emp.master_flag} onChange={(e) => handleInputChange(emp.employee_id, 'master_flag', e.target.checked)} className="h-5 w-5" />
+                      <input type="checkbox" checked={!!emp.master_flag} onChange={(e) => handleInputChange(emp.employee_id, 'master_flag', e.target.checked)} className="h-5 w-5" disabled={!isOwner} />
                     </td>
-                    <td className="p-2 border">
-                       <input type="text" value={passwordInputs[emp.employee_id] || ''} onChange={(e) => handlePasswordInputChange(emp.employee_id, e.target.value)} className="w-full p-1 border rounded" placeholder="変更時のみ入力" />
+                    {isOwner && (
+                      <td className="p-2 border">
+                        <input type="text" value={passwordInputs[emp.employee_id] || ''} onChange={(e) => handlePasswordInputChange(emp.employee_id, e.target.value)} className="w-full p-1 border rounded" placeholder="変更時のみ入力" disabled={!isOwner} />
+                      </td>
+                    )}
+                    <td className="p-2 border text-center">
+                        <button
+                            onClick={() => onSelectEmployee(emp.employee_id)}
+                            className="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600 disabled:bg-gray-400"
+                            disabled={isLocked}
+                        >
+                            参照
+                        </button>
                     </td>
                     <td className="p-2 border text-center">
-                      <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">更新</button>
+                      <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600" disabled={!isOwner}>更新</button>
                     </td>
                   </tr>
                 )
@@ -274,18 +286,18 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
               <tr className="bg-green-50">
                   <td className="p-2 border">新規</td>
                   <td className="p-2 border">
-                    <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded">
+                    <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded" disabled={!isOwner}>
                       {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
                     </select>
                   </td>
                   <td className="p-2 border">
-                      <input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" />
+                      <input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" disabled={!isOwner} />
                   </td>
                   <td className="p-2 border">
-                      <input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" />
+                      <input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" disabled={!isOwner} />
                   </td>
                   <td className="p-2 border">
-                     <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded">
+                     <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!isOwner}>
                           <option value="正社員">正社員</option>
                           <option value="アルバイト">アルバイト</option>
                           <option value="契約社員">契約社員</option>
@@ -293,9 +305,10 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, companies }) => {
                   </td>
                   <td className="p-2 border"></td>
                   <td className="p-2 border"></td>
+                  {isOwner && <td className="p-2 border"></td>}
                   <td className="p-2 border"></td>
                   <td className="p-2 border text-center">
-                      <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">追加</button>
+                      <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600" disabled={!isOwner}>追加</button>
                   </td>
               </tr>
             </tbody>

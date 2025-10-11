@@ -180,6 +180,15 @@ function App() {
     setEmployees(updatedEmployees);
   };
 
+  /**
+   * マスターメンテナンス画面で社員が選択（参照）されたときに呼び出される。
+   * @param {number} employeeId - 選択された社員のID
+   */
+  const handleEmployeeSelectInMaster = (employeeId) => {
+    setSelectedEmployeeId(employeeId);
+    setMasterModalOpen(false); // モーダルを閉じる
+  };
+
 
   // --- レンダリングのための表示用データ準備 ---
   const selectedEmployee = employees.find(e => e.employee_id === selectedEmployeeId);
@@ -241,6 +250,7 @@ function App() {
         isOpen={isMasterModalOpen}
         onRequestClose={() => setMasterModalOpen(false)}
         onMasterUpdate={handleMasterUpdate}
+        onSelectEmployee={handleEmployeeSelectInMaster}
         companies={companies}
       />
 
