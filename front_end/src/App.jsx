@@ -47,6 +47,14 @@ function App() {
   const [isMasterModalOpen, setMasterModalOpen] = useState(false); // マスターメンテナンスモーダル
   const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false); // 日報一覧モーダル
 
+  // マスターメンテナンスの認証状態
+  const [masterAuthState, setMasterAuthState] = useState({
+    isAuthenticated: false,
+    isOwner: false,
+    password: '',
+    timestamp: null,
+  });
+
   // 日報モーダルに渡す日付
   const [selectedDateForDailyReport, setSelectedDateForDailyReport] = useState(null);
 
@@ -205,6 +213,19 @@ function App() {
     setMasterModalOpen(false); // モーダルを閉じる
   };
 
+  /**
+   * マスターメンテナンスモーダルを開くハンドラ。
+   * 認証タイムアウト（5分）をチェックし、必要であれば認証状態をリセットする。
+   */
+  const handleOpenMaster = () => {
+    const fiveMinutes = 5 * 60 * 1000;
+    if (masterAuthState.timestamp && (new Date().getTime() - masterAuthState.timestamp > fiveMinutes)) {
+      alert('認証の有効期限が切れました。再度認証してください。');
+      setMasterAuthState({ isAuthenticated: false, isOwner: false, password: '', timestamp: null });
+    }
+    setMasterModalOpen(true);
+  };
+
 
   // --- レンダリングのための表示用データ準備 ---
   const selectedEmployee = employees.find(e => e.employee_id === selectedEmployeeId);
@@ -237,7 +258,7 @@ function App() {
         onSave={handleSave}
         onPrint={handlePrint}
         onOpenDailyReportList={() => setDailyReportListModalOpen(true)}
-        onOpenMaster={() => setMasterModalOpen(true)}
+        onOpenMaster={handleOpenMaster}
         onRowClick={(record) => {
           const dateStr = format(new Date(currentDate.getFullYear(), currentDate.getMonth(), record.day), 'yyyy-MM-dd');
           handleOpenDailyReport(dateStr);
@@ -269,6 +290,8 @@ function App() {
         onMasterUpdate={handleMasterUpdate}
         onSelectEmployee={handleEmployeeSelectInMaster}
         companies={companies}
+        auth={masterAuthState}
+        setAuth={setMasterAuthState}
       />
 
       {/* 日報一覧モーダル */}
