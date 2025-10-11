@@ -730,10 +730,17 @@ def add_employee():
 def update_employee(employee_id):
     """マスターメンテナンス画面から既存の社員情報を更新する。"""
     data = request.json
+    owner_id_from_request = data.get('owner_id')
 
     # --- オーナー認証 ---
-    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+    if not is_valid_owner(owner_id_from_request, data.get('owner_password')):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
+
+    # --- 更新権限の検証 ---
+    # オーナーは自分自身の情報のみ更新できる
+    if int(owner_id_from_request) != employee_id:
+        app.logger.warning(f"権限のない更新試行: 操作者={owner_id_from_request}, 対象社員={employee_id}")
+        return jsonify({"error": "自分以外の社員情報は更新できません"}), 403
 
     try:
         db = get_db()
