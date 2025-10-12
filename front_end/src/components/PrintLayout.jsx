@@ -3,28 +3,31 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
 
 /**
  * 印刷用の作業報告書レイアウトコンポーネント。
- * react-to-printライブラリから呼び出されることを想定しています。
- * @param {object} props - コンポーネントのプロパティ
- * @param {object} props.employee - 従業員情報
- * @param {object} props.company - 会社情報
- * @param {Date} props.currentDate - 表示対象の年月
- * @param {Array} props.workRecords - 勤務記録の配列
- * @param {object} props.holidays - 祝日情報
- * @param {React.Ref} ref - 印刷コンポーネント用のref
+ * このコンポーネントは`react-to-print`ライブラリによって使用されることを想定しており、
+ * 親から渡されたrefを受け取って印刷対象のDOM要素として設定します。
+ * 画面上には表示されませんが、印刷時にはこのコンポーネントのスタイルが適用されます。
+ *
+ * @param {object} props - コンポーネントのプロパティ。
+ * @param {object} props.employee - 社員情報オブジェクト。
+ * @param {object} props.company - 会社情報オブジェクト。
+ * @param {Date} props.currentDate - 表示対象の年月を示すDateオブジェクト。
+ * @param {Array<object>} props.workRecords - 1ヶ月分の勤務記録データの配列。
+ * @param {object} props.holidays - 祝日データ (キー: 'YYYY-MM-DD', 値: 祝日名)。
+ * @param {React.Ref} ref - `react-to-print`が印刷対象を識別するためのref。
+ * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
   const { employee, company, currentDate, workRecords, holidays } = props;
 
-  // 現在の年月を取得
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const daysInMonth = getDaysInMonth(currentDate);
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
 
   /**
-   * "HH:mm"形式の時刻文字列を分単位の数値に変換します。
-   * @param {string} timeStr - 時刻文字列 (例: "09:00")
-   * @returns {number} - 分単位の合計時間
+   * "HH:mm"形式の時間文字列を分単位の数値に変換します。
+   * @param {string | undefined} timeStr - 'HH:MM'形式の時間文字列。
+   * @returns {number} 合計分数。不正な形式の場合は0を返します。
    */
   const timeToMinutes = (timeStr) => {
     if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return 0;
@@ -33,9 +36,9 @@ const PrintLayout = React.forwardRef((props, ref) => {
   };
 
   /**
-   * 分単位の数値を"H:mm"形式の時刻文字列に変換します。
-   * @param {number} totalMinutes - 分単位の合計時間
-   * @returns {string} - "H:mm"形式の時刻文字列 (例: "8:00")
+   * 分単位の数値を "H:MM" 形式の時間文字列に変換します。
+   * @param {number} totalMinutes - 合計分数。
+   * @returns {string} フォーマットされた時間文字列。0以下の場合は空文字列を返します。
    */
   const minutesToTime = (totalMinutes) => {
     if (isNaN(totalMinutes) || totalMinutes <= 0) return '';
@@ -45,20 +48,22 @@ const PrintLayout = React.forwardRef((props, ref) => {
   };
   
   /**
-   * 開始時刻と終了時刻から稼働時間（分）を計算します。
-   * @param {string} start - 開始時刻 ("HH:mm")
-   * @param {string} end - 終了時刻 ("HH:mm")
-   * @returns {number} - 稼働時間（分）
+   * 開始時刻と終了時刻の差を分単位で計算します。
+   * @param {string} start - 開始時刻 ('HH:MM')。
+   * @param {string} end - 終了時刻 ('HH:MM')。
+   * @returns {number} 稼働時間（分）。日またぎ勤務は0として扱います。
    */
   const calculateDuration = (start, end) => {
     const startMinutes = timeToMinutes(start);
     const endMinutes = timeToMinutes(end);
-    // 日付をまたぐ場合などは考慮しない
     if (endMinutes < startMinutes) return 0;
     return endMinutes - startMinutes;
   };
   
-  // 月間の合計実働時間を計算
+  /**
+   * 月間の合計実働時間（分）を計算します。
+   * @type {number}
+   */
   const totalWorkTimeMinutes = workRecords.reduce((total, record) => {
       const workMinutes = calculateDuration(record.start_time, record.end_time);
       const breakMinutes = timeToMinutes(record.break_time);
@@ -67,14 +72,11 @@ const PrintLayout = React.forwardRef((props, ref) => {
   }, 0);
 
   return (
-    // refはreact-to-printに印刷対象を教えるために必要
     <div ref={ref} className="bg-white text-black print-container">
-      {/* ヘッダー：タイトルと年月 */}
       <div className="text-center mb-4">
         <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>
         <h1 className="text-lg font-bold" style={{ letterSpacing: '0.5em' }}>作業報告書</h1>
       </div>
-      {/* 従業員情報 */}
       <div className="flex justify-start mb-4 text-sm">
         <div>
           <p>会社名：{company?.company_name}</p>
@@ -83,9 +85,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
         </div>
       </div>
 
-      {/* 勤務記録テーブル */}
       <table className="w-full border-collapse border border-black text-xs" style={{ tableLayout: 'fixed' }}>
-        {/* テーブルヘッダー */}
         <thead>
           <tr className="bg-gray-200">
             <th className="border border-black p-1 w-[10%]">日付</th>
@@ -94,9 +94,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
             <th className="border border-black p-1 w-[65%]">作業内容</th>
           </tr>
         </thead>
-        {/* テーブルボディ */}
         <tbody>
-          {/* 1ヶ月分の行を生成 */}
           {Array.from({ length: daysInMonth }, (_, i) => {
             const day = i + 1;
             const date = new Date(year, month, day);
@@ -106,14 +104,11 @@ const PrintLayout = React.forwardRef((props, ref) => {
             const isSunday = dayOfWeek === 0;
             const isHoliday = !!holidays[dateStr];
 
-            // その日の勤務記録を検索
             const record = workRecords.find(r => r.day === day) || {};
-            // 実働時間を計算
             const workMinutes = calculateDuration(record.start_time, record.end_time);
             const breakMinutes = timeToMinutes(record.break_time);
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes);
             
-            // 行の背景色を決定（日曜・祝日は赤、土曜は青）
             const rowClass = 
               isSunday || isHoliday ? 'bg-red-100' :
               isSaturday ? 'bg-blue-100' : '';
@@ -128,20 +123,16 @@ const PrintLayout = React.forwardRef((props, ref) => {
             );
           })}
         </tbody>
-        {/* テーブルフッター */}
         <tfoot>
-            {/* 合計時間 */}
             <tr style={{ height: '28px' }}>
                 <td className="border border-black p-1 text-center font-bold" colSpan="2">合計</td>
                 <td className="border border-black p-1 text-center font-bold">{minutesToTime(totalWorkTimeMinutes)}</td>
                 <td className="border border-black p-1"></td>
             </tr>
-            {/* 特記事項 */}
             <tr>
                 <td className="border border-black p-1 align-top" rowSpan="4">特記事項</td>
                 <td className="p-1 align-top border-t border-r border-black" colSpan="3" rowSpan="4" style={{ height: '112px' }}></td>
             </tr>
-            {/* rowSpanを使用するために必要な空の行。CSSで非表示にする */}
             {Array.from({ length: 3 }).map((_, i) => (
                 <tr key={`note-fill-${i}`} className="hidden">
                     <td colSpan="3"></td>
@@ -153,7 +144,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
   );
 });
 
+// React DevToolsでコンポーネントが正しく表示されるようにdisplayNameを設定
 PrintLayout.displayName = 'PrintLayout';
 
 export default PrintLayout;
-

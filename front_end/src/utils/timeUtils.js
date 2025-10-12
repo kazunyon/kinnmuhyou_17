@@ -1,8 +1,9 @@
 /**
- * "HH:MM" 形式の文字列を分単位の数値に変換します。
- * 不正な形式の場合は null を返します。
- * @param {string} timeStr - "HH:MM" 形式の時間文字列
- * @returns {number|null} 分単位の数値、または null
+ * "HH:MM" 形式の時間文字列を分単位の数値に変換します。
+ * '23:59'までの時間を正しく扱います。
+ *
+ * @param {string} timeStr - "HH:MM" 形式の時間文字列。
+ * @returns {number|null} 変換された分単位の数値。入力が不正な形式の場合はnullを返します。
  */
 export const timeToMinutes = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string' || !/^\d{1,2}:\d{2}$/.test(timeStr)) {
@@ -16,9 +17,11 @@ export const timeToMinutes = (timeStr) => {
 };
 
 /**
- * 分単位の数値を "HH:MM" 形式の文字列に変換します。
- * @param {number} totalMinutes - 分単位の数値
- * @returns {string} "HH:MM" 形式の時間文字列
+ * 分単位の数値を "H:MM" 形式の文字列に変換します。
+ * 時間部分は2桁表示ではありません（例: "8:30"）。
+ *
+ * @param {number|null} totalMinutes - 分単位の数値。
+ * @returns {string} "H:MM" 形式の時間文字列。入力が無効な場合は空文字列を返します。
  */
 export const minutesToTime = (totalMinutes) => {
     if (totalMinutes === null || isNaN(totalMinutes) || totalMinutes < 0) {
@@ -30,9 +33,11 @@ export const minutesToTime = (totalMinutes) => {
 };
 
 /**
- * 時間の入力をフォーマットします (例: 9 -> 9:00, 930 -> 9:30)
- * @param {string} input - ユーザーの入力
- * @returns {string} フォーマットされた時間文字列
+ * 数値のみの文字列を "H:MM" または "HH:MM" 形式にフォーマットします。
+ * 例: "9" -> "9:00", "930" -> "9:30", "1230" -> "12:30"
+ *
+ * @param {string} input - ユーザーによって入力された時間文字列。
+ * @returns {string} フォーマットされた時間文字列。入力がない場合は空文字列を返します。
  */
 export const formatTime = (input) => {
     if (!input) return '';
@@ -51,9 +56,10 @@ export const formatTime = (input) => {
 };
 
 /**
- * 出退社時刻の入力が有効か検証します (00:00 - 23:45)
- * @param {string} timeStr - HH:MM形式の時刻
- * @returns {boolean} 有効な場合は true
+ * 出退社時刻の入力が有効か（00:00から23:45の間の15分刻みか）を検証します。
+ *
+ * @param {string} timeStr - "HH:MM"形式の時間文字列。
+ * @returns {boolean} 時間が有効な場合はtrue、それ以外はfalse。
  */
 export const validateTimeInput = (timeStr) => {
     if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return false;
@@ -62,12 +68,13 @@ export const validateTimeInput = (timeStr) => {
 };
 
 /**
- * 休憩時間の入力が有効か検証します (0:00 - 5:00)
- * @param {string} timeStr - H:MM形式の時刻
- * @returns {boolean} 有効な場合は true
+ * 休憩時間の入力が有効か（0:00から5:00の間か）を検証します。
+ *
+ * @param {string} timeStr - "H:MM"形式の時間文字列。
+ * @returns {boolean} 休憩時間が有効な場合はtrue、それ以外はfalse。
  */
 export const validateRestTimeInput = (timeStr) => {
     if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return false;
     const totalMinutes = timeToMinutes(timeStr);
-    return totalMinutes >= 0 && totalMinutes <= 300; // 5 hours * 60 minutes
+    return totalMinutes !== null && totalMinutes >= 0 && totalMinutes <= 300; // 5 hours * 60 minutes
 };

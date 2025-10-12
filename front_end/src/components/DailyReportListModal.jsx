@@ -7,6 +7,10 @@ import DailyReportListPrint from './DailyReportListPrint';
 
 const API_URL = '/api';
 
+/**
+ * モーダルのためのカスタムスタイル。
+ * @type {object}
+ */
 const modalStyles = {
   content: {
     top: '50%', left: '50%', right: 'auto', bottom: 'auto',
@@ -18,27 +22,46 @@ const modalStyles = {
   },
 };
 
+/**
+ * 指定された年月の全日報を一覧表示するモーダルコンポーネント。
+ * @param {object} props - コンポーネントのプロパティ。
+ * @param {boolean} props.isOpen - モーダルが開いているかどうか。
+ * @param {Function} props.onRequestClose - モーダルを閉じるための関数。
+ * @param {number} props.employeeId - 対象の社員ID。
+ * @param {number} props.year - 対象の年。
+ * @param {number} props.month - 対象の月。
+ * @returns {JSX.Element} レンダリングされたコンポーネント。
+ */
 const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month }) => {
+  /** @type {[Array<object>, Function]} 日報データのリストの状態管理 */
   const [reports, setReports] = useState([]);
+  /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
   const [isLoading, setIsLoading] = useState(false);
 
+  /** @type {React.MutableRefObject<undefined>} 印刷用コンポーネントへの参照 */
   const printComponentRef = useRef();
+
+  /**
+   * 印刷ダイアログをトリガーする関数。
+   */
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
   });
 
+  /**
+   * モーダルが開かれたときに、対象年月の全ての日報データをフェッチします。
+   * 日報データと作業記録を並行して取得し、表示用に結合します。
+   */
   useEffect(() => {
     if (isOpen) {
       const fetchReports = async () => {
         setIsLoading(true);
         try {
-          // 1ヶ月分の日付リストを作成
           const daysInMonth = getDaysInMonth(new Date(year, month - 1));
           const dateList = Array.from({ length: daysInMonth }, (_, i) => 
             format(new Date(year, month - 1, i + 1), 'yyyy-MM-dd')
           );
           
-          // 全ての日付の日報データを並行して取得
           const reportPromises = dateList.map(date => 
             axios.get(`${API_URL}/daily_report/${employeeId}/${date}`)
           );
@@ -128,6 +151,7 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
           </div>
         </div>
       </Modal>
+      {/* 印刷用のコンポーネント（画面外に配置） */}
       <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
         <DailyReportListPrint ref={printComponentRef} reports={reports} year={year} month={month} />
       </div>
@@ -135,13 +159,24 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
   );
 };
 
-// ヘルパー関数
+// --- ヘルパー関数 ---
+
+/**
+ * 'HH:MM'形式の時間文字列を分単位の数値に変換します。
+ * @param {string} timeStr - 時間文字列。
+ * @returns {number} 合計分数。不正な形式の場合は0を返します。
+ */
 const timeToMinutes = (timeStr) => {
     if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
 };
 
+/**
+ * 分単位の数値を'H:MM'形式の時間文字列に変換します。
+ * @param {number} totalMinutes - 合計分数。
+ * @returns {string} フォーマットされた時間文字列。0以下の場合は空文字列を返します。
+ */
 const minutesToTime = (totalMinutes) => {
     if (isNaN(totalMinutes) || totalMinutes <= 0) return '';
     const hours = Math.floor(totalMinutes / 60);
@@ -149,10 +184,17 @@ const minutesToTime = (totalMinutes) => {
     return `${hours}:${String(minutes).padStart(2, '0')}`;
 };
 
+/**
+ * 開始時刻、終了時刻、休憩時間から実働時間（分）を計算します。
+ * @param {string} start - 開始時刻 ('HH:MM')。
+ * @param {string} end - 終了時刻 ('HH:MM')。
+ * @param {string} breakTime - 休憩時間 ('HH:MM')。
+ * @returns {number} 実働分数。
+ */
 const calculateWorkMinutes = (start, end, breakTime) => {
     const startMinutes = timeToMinutes(start);
     const endMinutes = timeToMinutes(end);
-    if (endMinutes < startMinutes) return 0;
+    if (endMinutes < startMinutes) return 0; // 日またぎは考慮しない
     const workMinutes = endMinutes - startMinutes;
     const breakMinutes = timeToMinutes(breakTime);
     return Math.max(0, workMinutes - breakMinutes);
