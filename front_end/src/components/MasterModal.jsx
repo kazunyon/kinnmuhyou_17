@@ -252,8 +252,12 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
             <tbody>
               {employees.map(emp => {
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
+                // 更新ボタンの有効/無効ロジックを可読性のために変数に切り出す
+                const isRecordOfOwner = emp.employee_id === ownerInfo.owner_id;
+                const canUpdate = auth.isOwner && isRecordOfOwner;
+
                 return (
-                  <tr key={emp.employee_id} className="hover:bg-gray-50">
+                  <tr key={emp.employee_id} className={`hover:bg-gray-50 ${!canUpdate ? 'bg-gray-100' : ''}`}>
                     <td className="p-2 border">{emp.employee_id}</td>
                     <td className="p-2 border">{companyName}</td>
                     <td className="p-2 border">
@@ -283,7 +287,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                         >参照</button>
                     </td>
                     <td className="p-2 border text-center">
-                      <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600" disabled={!auth.isOwner}>更新</button>
+                      <button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button>
                     </td>
                   </tr>
                 )
