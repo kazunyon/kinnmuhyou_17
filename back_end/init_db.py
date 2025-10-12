@@ -6,8 +6,18 @@ db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db'
 schema_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'schema.sql')
 
 def init_db():
-    """
-    データベースを初期化し、スキーマを適用し、初期データを挿入する。
+    """データベースを初期化し、スキーマを適用して初期データを挿入します。
+
+    この関数は、アプリケーションのデータベースをセットアップするために使用されます。
+    実行されると、以下の処理を順次行います。
+    1. 既存のデータベースファイル (`database.db`) があれば削除します。
+    2. 新しいデータベースファイルを作成し、接続します。
+    3. `schema.sql` ファイルからSQLスキーマを読み込み、テーブルを作成します。
+    4. `companies`, `employees`, `holidays` テーブルに初期データを挿入します。
+       - `master_flag`が1の社員には、初期パスワードとして '123' が設定されます。
+
+    Raises:
+        sqlite3.Error: データベース操作中にエラーが発生した場合。
     """
     try:
         # データベースファイルが既に存在する場合は削除して作り直す
@@ -92,7 +102,7 @@ def init_db():
         print(f"データベースエラーが発生しました: {e}")
     finally:
         # 接続を閉じる
-        if connection:
+        if 'connection' in locals() and connection:
             connection.close()
             print("データベース接続をクローズしました。")
 

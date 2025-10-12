@@ -13,41 +13,52 @@ import { useReactToPrint } from 'react-to-print';
  * 開発環境 (vite dev) では vite.config.js のプロキシ設定によってバックエンドに転送される。
  * 本番環境 (flask serve) ではフロントエンドとAPIが同じオリジンから配信されるため、
  * スムーズに動作する相対パスが最適。
+ * @type {string}
  */
 const API_URL = '/api';
 
 /**
  * アプリケーションの最上位コンポーネント。
- * 全体の状態管理、APIとのデータ通信、主要コンポーネントのレンダリングを担当する。
+ * 全体の状態管理、APIとのデータ通信、主要コンポーネントのレンダリングを担当します。
+ * @returns {JSX.Element} レンダリングされたAppコンポーネント。
  */
 function App() {
   // --- State定義 ---
 
-  // マスターデータ
-  const [employees, setEmployees] = useState([]); // 社員リスト
-  const [companies, setCompanies] = useState([]); // 会社リスト
+  /** @type {[Array<object>, Function]} 社員リストの状態管理 */
+  const [employees, setEmployees] = useState([]);
+  /** @type {[Array<object>, Function]} 会社リストの状態管理 */
+  const [companies, setCompanies] = useState([]);
 
-  // ユーザーの選択状態
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(1); // ログインユーザーはID=1で固定
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1)); // 表示対象の年月 (初期値: 令和7年10月)
+  /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: 1) */
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
+  /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 2025年10月) */
+  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1));
 
-  // 表示データ
-  const [workRecords, setWorkRecords] = useState([]); // 1ヶ月分の作業記録
-  const [holidays, setHolidays] = useState({}); // 祝日データ (例: {'2025-01-01': '元日'})
-  const [specialNotes, setSpecialNotes] = useState(""); // 月次の特記事項
+  /** @type {[Array<object>, Function]} 1ヶ月分の作業記録の状態管理 */
+  const [workRecords, setWorkRecords] = useState([]);
+  /** @type {[object, Function]} 祝日データの状態管理 (例: {'2025-01-01': '元日'}) */
+  const [holidays, setHolidays] = useState({});
+  /** @type {[string, Function]} 月次の特記事項の状態管理 */
+  const [specialNotes, setSpecialNotes] = useState("");
 
-  // UIの状態
-  const [isLoading, setIsLoading] = useState(true); // データ読み込み中のフラグ
-  const [message, setMessage] = useState(''); // 保存成功時などに表示するメッセージ
-  const [ownerId, setOwnerId] = useState(null); // オーナーのID
-  const [isViewingOwnerReport, setIsViewingOwnerReport] = useState(false); // 表示中のレポートがオーナーのものか
+  /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
+  const [isLoading, setIsLoading] = useState(true);
+  /** @type {[string, Function]} ユーザーへの通知メッセージの状態管理 */
+  const [message, setMessage] = useState('');
+  /** @type {[number|null, Function]} オーナー社員IDの状態管理 */
+  const [ownerId, setOwnerId] = useState(null);
+  /** @type {[boolean, Function]} 表示中のレポートがオーナーのものかどうかの状態管理 */
+  const [isViewingOwnerReport, setIsViewingOwnerReport] = useState(false);
   
-  // モーダルウィンドウの開閉状態
-  const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false); // 日報入力モーダル
-  const [isMasterModalOpen, setMasterModalOpen] = useState(false); // マスターメンテナンスモーダル
-  const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false); // 日報一覧モーダル
+  /** @type {[boolean, Function]} 日報入力モーダルの表示状態 */
+  const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false);
+  /** @type {[boolean, Function]} マスターメンテナンスモーダルの表示状態 */
+  const [isMasterModalOpen, setMasterModalOpen] = useState(false);
+  /** @type {[boolean, Function]} 日報一覧モーダルの表示状態 */
+  const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false);
 
-  // マスターメンテナンスの認証状態
+  /** @type {[object, Function]} マスターメンテナンスの認証状態 */
   const [masterAuthState, setMasterAuthState] = useState({
     isAuthenticated: false,
     isOwner: false,
@@ -55,31 +66,27 @@ function App() {
     timestamp: null,
   });
 
-  // 日報モーダルに渡す日付
+  /** @type {[string|null, Function]} 日報モーダルで選択された日付の状態管理 */
   const [selectedDateForDailyReport, setSelectedDateForDailyReport] = useState(null);
 
-  // 印刷用コンポーネントへの参照
+  /** @type {React.MutableRefObject<undefined>} 印刷用コンポーネントへの参照 */
   const printComponentRef = useRef();
 
   // --- データ取得関連 (副作用フック) ---
 
   /**
-   * コンポーネントのマウント時に一度だけ実行される。
-   * 社員や会社などの基本的なマスターデータをサーバーから取得する。
+   * コンポーネントのマウント時に初期データをフェッチします。
+   * 社員、会社、オーナー情報をサーバーから取得します。
    */
   useEffect(() => {
     const fetchInitialData = async () => {
-      // setIsLoading(true); // workrecord取得時にisLoadingがセットされるので不要
       try {
-        // 社員リストと会社リストを並行して取得
-        const [empRes, compRes] = await Promise.all([
-          axios.get(`${API_URL}/employees`), // マスターモーダル用に必要
+        const [empRes, compRes, ownerRes] = await Promise.all([
+          axios.get(`${API_URL}/employees`),
           axios.get(`${API_URL}/companies`),
+          axios.get(`${API_URL}/owner_info`),
         ]);
-        // オーナー情報を取得
-        const ownerRes = await axios.get(`${API_URL}/owner_info`);
         setOwnerId(ownerRes.data.owner_id);
-
         setEmployees(empRes.data);
         setCompanies(compRes.data);
       } catch (error) {
@@ -88,11 +95,11 @@ function App() {
       }
     };
     fetchInitialData();
-  }, []); // 空の依存配列は、マウント時に一度だけ実行されることを意味する
+  }, []);
 
   /**
-   * 選択中の社員IDまたはオーナーIDが変更されたときに実行される。
-   * 表示中の作業報告書がオーナーのものであるかを判定する。
+   * selectedEmployeeIdまたはownerIdが変更されたときに、
+   * 表示中のレポートがオーナーのものかどうかを判定します。
    */
   useEffect(() => {
     if (ownerId !== null) {
@@ -101,31 +108,26 @@ function App() {
   }, [selectedEmployeeId, ownerId]);
 
   /**
-   * 選択中の社員ID (selectedEmployeeId) または年月 (currentDate) が変更されたときに実行される。
-   * 該当する年月の作業記録と、該当年の祝日データをサーバーから取得する。
+   * selectedEmployeeIdまたはcurrentDateが変更されたときに、
+   * 対応する作業記録と祝日データをフェッチします。
    */
   useEffect(() => {
-    if (!selectedEmployeeId) return; // 社員が選択されていなければ何もしない
+    if (!selectedEmployeeId) return;
 
     const fetchWorkData = async () => {
       setIsLoading(true);
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth() + 1;
       try {
-        // 作業記録と祝日データを並行して取得
         const [recordsRes, holidaysRes] = await Promise.all([
            axios.get(`${API_URL}/work_records/${selectedEmployeeId}/${year}/${month}`),
            axios.get(`${API_URL}/holidays/${year}`)
         ]);
         
-        // --- APIから取得したデータをUIで扱いやすい形式に整形 ---
-        // 1. APIからの日次記録を日付(day)をキーにしたMapに変換し、高速アクセスを可能にする
         const recordsMap = new Map(recordsRes.data.records.map(r => [r.day, r]));
-        // 2. その月の日数分の配列を生成する
         const daysInMonth = getDaysInMonth(currentDate);
         const newRecords = Array.from({ length: daysInMonth }, (_, i) => {
           const day = i + 1;
-          // 3. Mapに記録があればそのデータを、なければ空の初期データを設定する
           return recordsMap.get(day) || { day, work_content: '', start_time: '', end_time: '', break_time: '00:00' };
         });
 
@@ -136,7 +138,6 @@ function App() {
       } catch (error) {
         console.error("作業記録の取得に失敗しました:", error);
         setMessage("作業記録の取得に失敗しました。");
-        // エラーが発生した場合でも、テーブルが崩れないように空の記録で初期化する
         const daysInMonth = getDaysInMonth(currentDate);
         const emptyRecords = Array.from({ length: daysInMonth }, (_, i) => ({
           day: i + 1, work_content: '', start_time: '', end_time: '', break_time: '00:00'
@@ -144,18 +145,18 @@ function App() {
         setWorkRecords(emptyRecords);
         setSpecialNotes("");
       } finally {
-        setIsLoading(false); // 成功・失敗にかかわらずローディング状態を解除
+        setIsLoading(false);
       }
     };
 
     fetchWorkData();
-  }, [selectedEmployeeId, currentDate]); // 依存配列:これらの値が変更された時だけ再実行
+  }, [selectedEmployeeId, currentDate]);
   
   // --- イベントハンドラ ---
 
   /**
-   * 「保存」ボタンがクリックされたときに実行される。
-   * 現在の作業記録と特記事項をサーバーに送信する。
+   * 作業記録と特記事項をサーバーに保存します。
+   * @async
    */
   const handleSave = async () => {
     try {
@@ -165,13 +166,12 @@ function App() {
         employee_id: selectedEmployeeId,
         year,
         month,
-        // 何か一つでも入力がある行のみをフィルタリングして送信データ量を削減
         records: workRecords.filter(r => r.start_time || r.end_time || r.work_content),
         special_notes: specialNotes
       };
       const response = await axios.post(`${API_URL}/work_records`, payload);
       setMessage(response.data.message);
-      setTimeout(() => setMessage(''), 3000); // 3秒後にメッセージを自動的に消去
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error("保存に失敗しました:", error);
       setMessage("保存に失敗しました。");
@@ -179,17 +179,15 @@ function App() {
   };
 
   /**
-   * 「印刷」ボタンがクリックされたときに実行される。
-   * react-to-printライブラリを使用して印刷ダイアログをトリガーする。
+   * 印刷ダイアログをトリガーする関数。
    */
   const handlePrint = useReactToPrint({
-    content: () => printComponentRef.current, // 印刷するコンポーネントの参照を返す
+    content: () => printComponentRef.current,
   });
 
   /**
-   * ReportTableの行がダブルクリックされたときに呼び出される。
-   * 日報入力モーダルを開く。
-   * @param {string} date - 'YYYY-MM-DD'形式の日付文字列
+   * 日報入力モーダルを開きます。
+   * @param {string} date - 'YYYY-MM-DD'形式の日付文字列。
    */
   const handleOpenDailyReport = (date) => {
     setSelectedDateForDailyReport(date);
@@ -197,25 +195,25 @@ function App() {
   };
   
   /**
-   * マスターメンテナンスモーダルでデータが更新されたときに呼び出されるコールバック。
-   * @param {Array} updatedEmployees - 更新後の社員リスト
+   * マスターメンテナンスモーダルでのデータ更新をハンドリングします。
+   * @param {Array<object>} updatedEmployees - 更新後の社員リスト。
    */
   const handleMasterUpdate = (updatedEmployees) => {
     setEmployees(updatedEmployees);
   };
 
   /**
-   * マスターメンテナンス画面で社員が選択（参照）されたときに呼び出される。
-   * @param {number} employeeId - 選択された社員のID
+   * マスターメンテナンス画面で社員が選択された際のハンドラ。
+   * @param {number} employeeId - 選択された社員のID。
    */
   const handleEmployeeSelectInMaster = (employeeId) => {
     setSelectedEmployeeId(employeeId);
-    setMasterModalOpen(false); // モーダルを閉じる
+    setMasterModalOpen(false);
   };
 
   /**
-   * マスターメンテナンスモーダルを開くハンドラ。
-   * 認証タイムアウト（5分）をチェックし、必要であれば認証状態をリセットする。
+   * マスターメンテナンスモーダルを開きます。
+   * 5分間の認証タイムアウトをチェックします。
    */
   const handleOpenMaster = () => {
     const fiveMinutes = 5 * 60 * 1000;
@@ -226,22 +224,17 @@ function App() {
     setMasterModalOpen(true);
   };
 
-
   // --- レンダリングのための表示用データ準備 ---
   const selectedEmployee = employees.find(e => e.employee_id === selectedEmployeeId);
   const company = companies.find(c => c.company_id === selectedEmployee?.company_id);
   
-  // 初期データの読み込みが完了するまでローディング表示
   if (!employees.length || !companies.length) {
     return <div className="p-4">初期データを読み込み中です...</div>;
   }
 
-  // --- レンダリング ---
   return (
     <div className="bg-gray-100 min-h-screen p-4 font-sans text-10pt">
-      {/* メイン画面コンポーネント */}
       <ReportScreen
-        // 表示用データ
         selectedEmployee={selectedEmployee}
         company={company}
         currentDate={currentDate}
@@ -251,7 +244,6 @@ function App() {
         isLoading={isLoading}
         message={message}
         isReadOnly={!isViewingOwnerReport}
-        // イベントハンドラ (状態を変更する関数)
         onDateChange={setCurrentDate}
         onWorkRecordsChange={setWorkRecords}
         onSpecialNotesChange={setSpecialNotes}
@@ -265,17 +257,14 @@ function App() {
         }}
       />
 
-      {/* 日報入力モーダル */}
       <DailyReportModal
         isOpen={isDailyReportModalOpen}
         onRequestClose={() => setDailyReportModalOpen(false)}
         employeeId={selectedEmployeeId}
         employeeName={selectedEmployee?.employee_name}
         date={selectedDateForDailyReport}
-        // 選択された日付に該当する作業記録を探して渡す
         workRecord={workRecords.find(r => selectedDateForDailyReport && r.day === new Date(selectedDateForDailyReport).getDate())}
         onSave={(updatedWorkRecord) => {
-            // モーダルで作業時間が更新された場合、メイン画面のworkRecords stateにも反映する
             const updatedRecords = workRecords.map(r => 
                 r.day === updatedWorkRecord.day ? {...r, ...updatedWorkRecord} : r
             );
@@ -283,7 +272,6 @@ function App() {
         }}
       />
       
-      {/* マスターメンテナンスモーダル */}
       <MasterModal
         isOpen={isMasterModalOpen}
         onRequestClose={() => setMasterModalOpen(false)}
@@ -294,7 +282,6 @@ function App() {
         setAuth={setMasterAuthState}
       />
 
-      {/* 日報一覧モーダル */}
       <DailyReportListModal
         isOpen={isDailyReportListModalOpen}
         onRequestClose={() => setDailyReportListModalOpen(false)}
@@ -303,7 +290,6 @@ function App() {
         month={currentDate.getMonth() + 1}
       />
       
-      {/* 印刷用レイアウトコンポーネント (画面上には表示されない) */}
       <div style={{ visibility: 'hidden', height: 0, overflow: 'hidden' }}>
         <PrintLayout
           ref={printComponentRef}

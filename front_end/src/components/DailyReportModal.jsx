@@ -4,6 +4,10 @@ import axios from 'axios';
 
 const API_URL = '/api';
 
+/**
+ * モーダルのためのカスタムスタイル。
+ * @type {object}
+ */
 const modalStyles = {
   content: {
     top: '50%', left: '50%', right: 'auto', bottom: 'auto',
@@ -15,46 +19,53 @@ const modalStyles = {
   },
 };
 
+/**
+ * 特定の日付の日報を入力・編集するためのモーダルコンポーネント。
+ * @param {object} props - コンポーネントのプロパティ。
+ * @param {boolean} props.isOpen - モーダルが開いているかどうか。
+ * @param {Function} props.onRequestClose - モーダルを閉じるための関数。
+ * @param {number} props.employeeId - 対象の社員ID。
+ * @param {string} props.employeeName - 対象の社員名。
+ * @param {string} props.date - 対象の日付 ('YYYY-MM-DD')。
+ * @param {object} props.workRecord - 対象日の作業記録オブジェクト。
+ * @param {Function} props.onSave - 時間や作業内容の変更を親コンポーネントに通知するコールバック関数。
+ * @returns {JSX.Element} レンダリングされたモーダルコンポーネント。
+ */
 const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, date, workRecord, onSave }) => {
+  /** @type {[object, Function]} 日報のテキストデータの状態管理 */
   const [reportData, setReportData] = useState({
     work_summary: '', problems: '', challenges: '', tomorrow_tasks: '', thoughts: ''
   });
   
+  /** @type {[object, Function]} 勤務時間の状態管理 */
   const [times, setTimes] = useState({
-      startTime: workRecord?.start_time || '09:00',
-      endTime: workRecord?.end_time || '18:00',
-      breakTime: workRecord?.break_time || '01:00'
+      startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
+  /**
+   * モーダルが開いたとき、または主要なpropが変更されたときに日報データを取得します。
+   * 親から渡された作業記録を基に時間と作業内容を初期設定し、
+   * その他の日報項目はAPIからフェッチします。
+   */
   useEffect(() => {
-    // モーダルが開かれた時、または日付や社員が変更された時にデータを取得
     if (isOpen && employeeId && date) {
-      // 勤務時間情報を親コンポーネントから受け取る
       setTimes({
           startTime: workRecord?.start_time || '09:00',
           endTime: workRecord?.end_time || '18:00',
           breakTime: workRecord?.break_time || '01:00'
       });
       
-      // 日報情報をAPIから取得
       const fetchReport = async () => {
         try {
           const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
+          const initialData = {
+              work_summary: workRecord?.work_content || '',
+              problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
+          };
           if (response.data) {
-            // 作業内容は work_record から取得し、他はAPIレスポンスから取得
-            setReportData({
-                work_summary: workRecord?.work_content || '',
-                problems: response.data.problems || '・',
-                challenges: response.data.challenges || '・',
-                tomorrow_tasks: response.data.tomorrow_tasks || '・',
-                thoughts: response.data.thoughts || '・',
-            });
+            setReportData({ ...initialData, ...response.data });
           } else {
-             // データがない場合は初期化
-             setReportData({
-                work_summary: workRecord?.work_content || '',
-                problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
-            });
+            setReportData(initialData);
           }
         } catch (error) {
           console.error("日報データの取得に失敗しました:", error);
@@ -64,6 +75,12 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     }
   }, [isOpen, employeeId, date, workRecord]);
 
+  /**
+   * 時間選択の変更をハンドリングし、stateを更新します。
+   * @param {'startTime'|'endTime'} field - 変更対象の時間フィールド。
+   * @param {'h'|'m'} part - 変更対象が時間か分か。
+   * @param {string} value - 新しい値。
+   */
   const handleTimeChange = (field, part, value) => {
       const currentTime = times[field];
       let [h, m] = currentTime.split(':');
@@ -72,12 +89,20 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       setTimes(prev => ({...prev, [field]: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}));
   };
   
+  /**
+   * テキストエリアの変更をハンドリングし、stateを更新します。
+   * @param {string} field - 変更対象のフィールド名。
+   * @param {string} value - 新しい値。
+   */
   const handleDataChange = (field, value) => {
     setReportData(prev => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * 「適用して閉じる」ボタンのハンドラ。
+   * 親コンポーネントに変更を通知し、モーダルを閉じます。DBへの保存は行いません。
+   */
   const handleApplyAndClose = () => {
-    // 親コンポーネントに時間と作業内容の変更を通知
     onSave({
         day: new Date(date).getDate(),
         start_time: times.startTime,
@@ -85,11 +110,13 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
         break_time: times.breakTime,
         work_content: reportData.work_summary,
     });
-    // 変更を適用した後、モーダルを閉じる
-    // DBへの保存は行わず、メイン画面の保存ボタンに委ねる
     onRequestClose();
   };
 
+  /**
+   * 「日報ポスト」ボタンのハンドラ。
+   * 現在の日報データを整形し、クリップボードにコピーします。
+   */
   const handlePostReport = () => {
     const postBody = `日報入力 (${date})
 氏名：${employeeName || ''}
@@ -105,9 +132,7 @@ ${reportData.tomorrow_tasks}
 ${reportData.thoughts}`;
 
     navigator.clipboard.writeText(postBody)
-      .then(() => {
-        alert('日報がクリップボードにコピーされました。');
-      })
+      .then(() => alert('日報がクリップボードにコピーされました。'))
       .catch(err => {
         console.error('クリップボードへのコピーに失敗しました:', err);
         alert('クリップボードへのコピーに失敗しました。');
@@ -117,8 +142,14 @@ ${reportData.thoughts}`;
   // 時間と分の選択肢を生成
   const hourOptions = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
   const minuteOptions = ['00', '15', '30', '45'];
-  const breakMinuteOptions = Array.from({length: 13}, (_, i) => String(i * 15)); // 0分から300分(5時間)まで
+  const breakMinuteOptions = Array.from({length: 21}, (_, i) => String(i * 15)); // 0分から300分(5時間)まで
 
+  /**
+   * 開始・終了時刻のピッカーをレンダリングするヘルパー関数。
+   * @param {'startTime'|'endTime'} field - 対象フィールド。
+   * @param {string} label - 表示ラベル。
+   * @returns {JSX.Element}
+   */
   const renderTimePicker = (field, label) => {
       const [h, m] = (times[field] || "00:00").split(":");
       return (
@@ -136,6 +167,10 @@ ${reportData.thoughts}`;
       );
   };
 
+  /**
+   * アクションボタン群をレンダリングするための変数。
+   * @type {JSX.Element}
+   */
   const actionButtons = (
     <div className="flex justify-end space-x-4">
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
@@ -185,7 +220,6 @@ ${reportData.thoughts}`;
           </div>
         </div>
         
-        {/* ボタン */}
         <div className="flex justify-end space-x-4 pt-4">
           {actionButtons}
         </div>
@@ -194,6 +228,15 @@ ${reportData.thoughts}`;
   );
 };
 
+/**
+ * ラベル付きのテキストエリアを表示する汎用コンポーネント。
+ * @param {object} props - コンポーネントのプロパティ。
+ * @param {string} props.label - テキストエリアのラベル。
+ * @param {string} props.value - テキストエリアの現在の値。
+ * @param {Function} props.onChange - 値が変更されたときのコールバック関数。
+ * @param {number} props.rows - テキストエリアの行数。
+ * @returns {JSX.Element} レンダリングされたテキストエリアフィールド。
+ */
 const TextAreaField = ({ label, value, onChange, rows }) => (
     <div>
       <label className="block font-semibold mb-1">{label}</label>
