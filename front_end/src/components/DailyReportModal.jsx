@@ -42,6 +42,14 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
+  /** @type {[boolean, Function]} データが変更されたかどうか */
+  const [isDirty, setIsDirty] = useState(false);
+  /** @type {[object, Function]} 日報テキストデータの初期状態 */
+  const [initialReportData, setInitialReportData] = useState(reportData);
+  /** @type {[object, Function]} 勤務時間の初期状態 */
+  const [initialTimes, setInitialTimes] = useState(times);
+
+
   /**
    * モーダルが開いたとき、または主要なpropが変更されたときに日報データを取得します。
    * 親から渡された作業記録を基に時間と作業内容を初期設定し、
@@ -49,11 +57,13 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
    */
   useEffect(() => {
     if (isOpen && employeeId && date) {
-      setTimes({
-          startTime: workRecord?.start_time || '09:00',
-          endTime: workRecord?.end_time || '18:00',
-          breakTime: workRecord?.break_time || '01:00'
-      });
+      const initialTimesData = {
+        startTime: workRecord?.start_time || '09:00',
+        endTime: workRecord?.end_time || '18:00',
+        breakTime: workRecord?.break_time || '01:00'
+      };
+      setTimes(initialTimesData);
+      setInitialTimes(initialTimesData);
       
       const fetchReport = async () => {
         try {
@@ -64,16 +74,28 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
           };
           if (response.data) {
             setReportData({ ...initialData, ...response.data });
+            setInitialReportData({ ...initialData, ...response.data });
           } else {
             setReportData(initialData);
+            setInitialReportData(initialData);
           }
         } catch (error) {
           console.error("日報データの取得に失敗しました:", error);
         }
       };
       fetchReport();
+      setIsDirty(false); // モーダルが開かれるたびにリセット
     }
   }, [isOpen, employeeId, date, workRecord]);
+
+  /**
+   * データが変更されたかどうかを監視します。
+   */
+  useEffect(() => {
+    const isTimesDirty = JSON.stringify(times) !== JSON.stringify(initialTimes);
+    const isReportDirty = JSON.stringify(reportData) !== JSON.stringify(initialReportData);
+    setIsDirty(isTimesDirty || isReportDirty);
+  }, [times, reportData, initialTimes, initialReportData]);
 
   /**
    * 時間選択の変更をハンドリングし、stateを更新します。
@@ -171,19 +193,36 @@ ${reportData.thoughts}`;
    * アクションボタン群をレンダリングするための変数。
    * @type {JSX.Element}
    */
+  /**
+   * モーダルを閉じるリクエストを処理します。
+   * 未保存の変更がある場合は、ユーザーに確認を求めます。
+   */
+  const handleClose = () => {
+    if (isDirty) {
+      if (window.confirm('変更内容が保存されていません。本当に閉じてよろしいですか？')) {
+        onRequestClose();
+      }
+    } else {
+      onRequestClose();
+    }
+  };
+
   const actionButtons = (
     <div className="flex justify-end space-x-4">
-      <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
+      <button onClick={handleClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
       <button onClick={handleApplyAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
     </div>
   );
 
   return (
-    <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="日報入力">
+    <Modal isOpen={isOpen} onRequestClose={handleClose} style={modalStyles} contentLabel="日報入力">
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-center flex-grow">日報入力 ({date})</h2>
+          <h2 className="text-xl font-bold text-center flex-grow">
+            日報入力 ({date})
+            {isDirty && <span className="text-red-500 ml-4">更新あり</span>}
+          </h2>
           {actionButtons}
         </div>
 
@@ -237,16 +276,20 @@ ${reportData.thoughts}`;
  * @param {number} props.rows - テキストエリアの行数。
  * @returns {JSX.Element} レンダリングされたテキストエリアフィールド。
  */
-const TextAreaField = ({ label, value, onChange, rows }) => (
+const TextAreaField = ({ label, value, onChange, rows }) => {
+  const textareaId = `textarea-${label}`;
+  return (
     <div>
-      <label className="block font-semibold mb-1">{label}</label>
+      <label htmlFor={textareaId} className="block font-semibold mb-1">{label}</label>
       <textarea
+        id={textareaId}
         value={value}
         onChange={onChange}
         rows={rows}
         className="w-full p-2 border rounded"
       />
     </div>
-);
+  );
+};
 
 export default DailyReportModal;
