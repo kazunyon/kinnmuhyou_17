@@ -191,7 +191,7 @@ function App() {
         employee_id: selectedEmployeeId,
         year,
         month,
-        records: workRecords.filter(r => r.start_time || r.end_time || r.work_content),
+        records: workRecords,
         special_notes: specialNotes
       };
       const response = await axios.post(`${API_URL}/work_records`, payload);
