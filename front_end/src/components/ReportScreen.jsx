@@ -41,7 +41,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
-  isLoading, message, isReadOnly, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
+  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
   onSave, onPrint, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
@@ -93,6 +93,7 @@ const ReportScreen = ({
 
         <h1 className="text-center text-lg font-bold" style={{fontSize: '14pt', letterSpacing: '0.5em'}}>
           作業報告書
+          {isReportScreenDirty && <span className="text-red-500 ml-4 text-sm">(更新あり)</span>}
         </h1>
 
         {/* 操作ボタン */}
@@ -140,8 +141,9 @@ const ReportScreen = ({
       
       {/* 特記事項 */}
       <div className="mt-4">
-        <label className="font-bold block mb-1">特記事項</label>
+        <label htmlFor="special-notes-textarea" className="font-bold block mb-1">特記事項</label>
         <textarea
+          id="special-notes-textarea"
           value={specialNotes}
           onChange={(e) => onSpecialNotesChange(e.target.value)}
           rows="5"
