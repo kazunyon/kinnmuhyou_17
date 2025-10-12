@@ -42,6 +42,13 @@ function App() {
   /** @type {[string, Function]} 月次の特記事項の状態管理 */
   const [specialNotes, setSpecialNotes] = useState("");
 
+  /** @type {[Array<object>, Function]} 作業記録の初期状態 */
+  const [initialWorkRecords, setInitialWorkRecords] = useState([]);
+  /** @type {[string, Function]} 特記事項の初期状態 */
+  const [initialSpecialNotes, setInitialSpecialNotes] = useState("");
+  /** @type {[boolean, Function]} 作業報告書画面が変更されたかどうかの状態管理 */
+  const [isReportScreenDirty, setIsReportScreenDirty] = useState(false);
+
   /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
   const [isLoading, setIsLoading] = useState(true);
   /** @type {[string, Function]} ユーザーへの通知メッセージの状態管理 */
@@ -131,9 +138,14 @@ function App() {
           return recordsMap.get(day) || { day, work_content: '', start_time: '', end_time: '', break_time: '00:00' };
         });
 
+        const newSpecialNotes = recordsRes.data.special_notes || "";
+
         setWorkRecords(newRecords);
-        setSpecialNotes(recordsRes.data.special_notes || "");
+        setInitialWorkRecords(newRecords);
+        setSpecialNotes(newSpecialNotes);
+        setInitialSpecialNotes(newSpecialNotes);
         setHolidays(holidaysRes.data);
+        setIsReportScreenDirty(false);
         
       } catch (error) {
         console.error("作業記録の取得に失敗しました:", error);
@@ -143,7 +155,9 @@ function App() {
           day: i + 1, work_content: '', start_time: '', end_time: '', break_time: '00:00'
         }));
         setWorkRecords(emptyRecords);
+        setInitialWorkRecords(emptyRecords);
         setSpecialNotes("");
+        setInitialSpecialNotes("");
       } finally {
         setIsLoading(false);
       }
@@ -151,6 +165,17 @@ function App() {
 
     fetchWorkData();
   }, [selectedEmployeeId, currentDate]);
+
+  /**
+   * workRecordsまたはspecialNotesが変更されたときに、
+   * isReportScreenDirtyフラグを更新します。
+   */
+  useEffect(() => {
+    const isDirty =
+      JSON.stringify(workRecords) !== JSON.stringify(initialWorkRecords) ||
+      specialNotes !== initialSpecialNotes;
+    setIsReportScreenDirty(isDirty);
+  }, [workRecords, specialNotes, initialWorkRecords, initialSpecialNotes]);
   
   // --- イベントハンドラ ---
 
@@ -171,6 +196,12 @@ function App() {
       };
       const response = await axios.post(`${API_URL}/work_records`, payload);
       setMessage(response.data.message);
+
+      // 保存が成功したので、初期状態を現在の状態に更新し、dirtyフラグをリセット
+      setInitialWorkRecords(workRecords);
+      setInitialSpecialNotes(specialNotes);
+      setIsReportScreenDirty(false);
+
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       console.error("保存に失敗しました:", error);
@@ -184,6 +215,21 @@ function App() {
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
   });
+
+  /**
+   * 年月が変更されたときのハンドラ。
+   * 未保存の変更がある場合は確認ダイアログを表示します。
+   * @param {Date} newDate - 新しい日付オブジェクト。
+   */
+  const handleChangeDate = (newDate) => {
+    if (isReportScreenDirty) {
+      if (window.confirm('変更が保存されていません。移動してもよろしいですか？')) {
+        setCurrentDate(newDate);
+      }
+    } else {
+      setCurrentDate(newDate);
+    }
+  };
 
   /**
    * 日報入力モーダルを開きます。
@@ -244,7 +290,8 @@ function App() {
         isLoading={isLoading}
         message={message}
         isReadOnly={!isViewingOwnerReport}
-        onDateChange={setCurrentDate}
+        isReportScreenDirty={isReportScreenDirty}
+        onDateChange={handleChangeDate}
         onWorkRecordsChange={setWorkRecords}
         onSpecialNotesChange={setSpecialNotes}
         onSave={handleSave}
