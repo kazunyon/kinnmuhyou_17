@@ -76,27 +76,18 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     setReportData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = async () => {
-    const payload = {
-      employee_id: employeeId,
-      date,
-      ...reportData,
-    };
-    try {
-      await axios.post(`${API_URL}/daily_report`, payload);
-      // 親コンポーネントに時間と作業内容の変更を通知
-      onSave({
-          day: new Date(date).getDate(),
-          start_time: times.startTime,
-          end_time: times.endTime,
-          break_time: times.breakTime,
-          work_content: reportData.work_summary,
-      });
-      onRequestClose();
-    } catch (error) {
-      console.error("日報の保存に失敗しました:", error);
-      alert("日報の保存に失敗しました。");
-    }
+  const handleApplyAndClose = () => {
+    // 親コンポーネントに時間と作業内容の変更を通知
+    onSave({
+        day: new Date(date).getDate(),
+        start_time: times.startTime,
+        end_time: times.endTime,
+        break_time: times.breakTime,
+        work_content: reportData.work_summary,
+    });
+    // 変更を適用した後、モーダルを閉じる
+    // DBへの保存は行わず、メイン画面の保存ボタンに委ねる
+    onRequestClose();
   };
 
   const handlePostReport = () => {
@@ -147,9 +138,9 @@ ${reportData.thoughts}`;
 
   const actionButtons = (
     <div className="flex justify-end space-x-4">
-      <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">キャンセル</button>
+      <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-      <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
+      <button onClick={handleApplyAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
     </div>
   );
 
