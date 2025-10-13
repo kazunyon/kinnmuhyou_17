@@ -109,10 +109,10 @@ def close_db(exception):
 
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
-    """マスター権限を持つ在籍中の全社員リストを取得します。
+    """在籍中の全社員リストを取得します。
 
     このエンドポイントは、作業報告書の氏名選択プルダウンで使用されることを想定しています。
-    `master_flag`が1かつ`retirement_flag`が0の社員にフィルタリングされます。
+    `retirement_flag`が0の社員にフィルタリングされます。
     セキュリティのため、レスポンスからパスワードフィールドは除外されます。
 
     Returns:
@@ -121,14 +121,14 @@ def get_employees():
     """
     try:
         db = get_db()
-        cursor = db.execute('SELECT * FROM employees WHERE master_flag = 1 AND retirement_flag = 0 ORDER BY employee_id')
+        cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         for emp in employees:
             emp.pop('password', None)
-        app.logger.info(f"{len(employees)}件のマスター権限を持つ社員データを取得しました。")
+        app.logger.info(f"{len(employees)}件の社員データを取得しました。")
         return jsonify(employees)
     except Exception as e:
-        app.logger.error(f"マスター社員データ取得エラー: {e}")
+        app.logger.error(f"社員データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/employees/all', methods=['GET'])
@@ -144,7 +144,7 @@ def get_all_employees():
     """
     try:
         db = get_db()
-        cursor = db.execute('SELECT employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag FROM employees ORDER BY employee_id')
+        cursor = db.execute('SELECT employee_id, company_id, employee_name, department_name, employee_type, retirement_flag FROM employees ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         app.logger.info(f"全社員データ（マスター用）を{len(employees)}件取得しました。")
         return jsonify(employees)
@@ -157,8 +157,7 @@ def authenticate_master():
     """マスターメンテナンス画面でのユーザー認証を行います。
 
     提供された社員IDとパスワードを検証します。
-    認証が成功した場合、ユーザーがマスター権限を持っているか、
-    およびオーナーであるかどうかのフラグを返します。
+    認証が成功した場合、ユーザーがオーナーであるかどうかのフラグを返します。
 
     Request Body (JSON):
         {
@@ -168,7 +167,7 @@ def authenticate_master():
 
     Returns:
         Response: 認証結果を含むJSONレスポンス。
-                  成功時には { "success": True, "is_master": bool, "is_owner": bool } を返します。
+                  成功時には { "success": True, "is_owner": bool } を返します。
                   失敗時には適切なエラーメッセージとステータスコードを返します。
     """
     data = request.json
@@ -181,34 +180,28 @@ def authenticate_master():
     try:
         db = get_db()
         cursor = db.execute(
-            'SELECT password, master_flag FROM employees WHERE employee_id = ?',
+            'SELECT password FROM employees WHERE employee_id = ?',
             (employee_id,)
         )
         user = cursor.fetchone()
 
         if user and user['password'] and check_password_hash(user['password'], password):
-            is_master = user['master_flag'] == 1
             owner_id = get_owner_id()
-            is_owner = is_master and (int(employee_id) == owner_id)
+            is_owner = int(employee_id) == owner_id
 
-            if not is_master:
-                app.logger.warning(f"認証試行（マスター権限なし）: 社員ID={employee_id}")
-                return jsonify({"success": True, "is_master": False, "is_owner": False, "message": "マスター権限がありません"}), 200
-
-            app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}")
+            app.logger.info(f"認証成功: 社員ID={employee_id}, オーナー={is_owner}")
 
             return jsonify({
                 "success": True,
                 "message": "認証に成功しました",
-                "is_master": True,
                 "is_owner": is_owner
             }), 200
         else:
-            app.logger.warning(f"マスター認証失敗: 社員ID={employee_id}")
+            app.logger.warning(f"認証失敗: 社員ID={employee_id}")
             return jsonify({"success": False, "message": "認証情報が正しくありません"}), 401
 
     except Exception as e:
-        app.logger.error(f"マスター認証エラー: {e}")
+        app.logger.error(f"認証エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/companies', methods=['GET'])
@@ -768,19 +761,17 @@ def add_employee():
         db = get_db()
         cursor = db.cursor()
 
-        is_master = data.get('master_flag', False)
-        password_hash = generate_password_hash('123') if is_master else None
+        password_hash = generate_password_hash('123')
 
         cursor.execute("""
-            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, (
             target_company_id,
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
             1 if data.get('retirement_flag') else 0,
-            1 if is_master else 0,
             password_hash
         ))
         db.commit()
@@ -806,25 +797,25 @@ def update_employee(employee_id):
     if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    # ユーザーからの要求に基づき、オーナーは自分自身の情報のみ更新できるよ​​うに修正
-    # owner_id はリクエストのボディから、employee_id はURLのパスから取得
-    if int(owner_id) != employee_id:
-        app.logger.warning(f"権限のない更新試行: オーナー(ID:{owner_id})が他人(ID:{employee_id})の情報を更新しようとしました。")
-        return jsonify({"error": "この操作を行う権限がありません"}), 403
+    # オーナーは自身の会社の従業員情報を更新できる
+    owner_company_id = _get_employee_company_id(owner_id)
+    target_company_id = _get_employee_company_id(employee_id)
+    if not owner_company_id or owner_company_id != target_company_id:
+        app.logger.warning(f"権限のない更新試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{target_company_id})の社員(ID:{employee_id})を更新しようとしました。")
+        return jsonify({"error": "自分の会社の社員情報のみ更新できます"}), 403
 
     try:
         db = get_db()
         db.execute("""
             UPDATE employees SET
             employee_name = ?, department_name = ?, employee_type = ?,
-            retirement_flag = ?, master_flag = ?
+            retirement_flag = ?
             WHERE employee_id = ?
         """, (
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
             1 if data.get('retirement_flag') else 0,
-            1 if data.get('master_flag') else 0,
             employee_id
         ))
         app.logger.info(f"社員情報（パスワードを除く）を更新しました: ID={employee_id}")

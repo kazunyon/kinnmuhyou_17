@@ -36,7 +36,7 @@ Modal.setAppElement('#root');
  * @param {Function} props.setAuth - 親の認証状態を更新する関数。
  * @returns {JSX.Element} レンダリングされたマスターメンテナンスモーダル。
  */
-const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, companies, auth, setAuth }) => {
+const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth }) => {
   /** @type {[Array<object>, Function]} 全社員リストの状態管理 */
   const [employees, setEmployees] = useState([]);
   /** @type {[object, Function]} 新規追加社員の入力データの状態管理 */
@@ -85,7 +85,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
    * @param {string|boolean} value - 新しい値。
    */
   const handleInputChange = (id, field, value) => {
-    const val = field === 'retirement_flag' || field === 'master_flag' ? !!value : value;
+    const val = field === 'retirement_flag' ? !!value : value;
     const updatedEmployees = employees.map(emp =>
       emp.employee_id === id ? { ...emp, [field]: val } : emp
     );
@@ -116,7 +116,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         password: passwordInput
       });
 
-      if (!res.data.success || !res.data.is_master) {
+      if (!res.data.success) {
         alert(res.data.message || '認証に失敗しました。');
         return;
       }
@@ -128,7 +128,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         timestamp: new Date().getTime(),
       });
 
-      alert(res.data.is_owner ? 'オーナーとして認証しました。編集が可能です。' : '参照権限で認証しました。編集はできません。');
+      alert(res.data.is_owner ? 'オーナーとして認証しました。編集が可能です。' : '認証しました。参照のみ可能です。');
       setPasswordInput('');
     } catch (error) {
       console.error("認証処理中にエラーが発生しました:", error);
@@ -153,6 +153,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       owner_password: auth.password,
     };
     delete dataToSend.password;
+    delete dataToSend.master_flag;
 
     try {
       await axios.put(`${API_URL}/employee/${employee.employee_id}`, dataToSend);
@@ -224,7 +225,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 <th className="p-2 border">社員ID</th><th className="p-2 border">企業名</th>
                 <th className="p-2 border">部署名</th><th className="p-2 border">氏名</th>
                 <th className="p-2 border">社員区分</th><th className="p-2 border">退職</th>
-                <th className="p-2 border">マスター</th><th className="p-2 border">参照</th>
+                <th className="p-2 border">参照</th>
                 <th className="p-2 border">操作</th>
               </tr>
             </thead>
@@ -240,7 +241,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 const canUpdate = auth.isOwner && emp.company_id === ownerCompanyId;
 
                 return (
-                  <tr key={emp.employee_id} className={`hover:bg-gray-50 ${!canUpdate && emp.employee_id !== ownerInfo.owner_id ? 'bg-gray-100' : ''}`}>
+                  <tr key={emp.employee_id}
+                      className={`hover:bg-gray-50 cursor-pointer ${!canUpdate ? 'bg-gray-100' : ''} ${selectedEmployeeId === emp.employee_id ? 'bg-blue-100' : ''}`}
+                      onClick={() => onSelectEmployee(emp.employee_id)}>
                     <td className="p-2 border">{emp.employee_id}</td>
                     <td className="p-2 border">{companyName}</td>
                     <td className="p-2 border"><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
@@ -251,9 +254,10 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                        </select>
                     </td>
                     <td className="p-2 border text-center"><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" disabled={!canUpdate} /></td>
-                    <td className="p-2 border text-center"><input type="checkbox" checked={!!emp.master_flag} onChange={(e) => handleInputChange(emp.employee_id, 'master_flag', e.target.checked)} className="h-5 w-5" disabled={!canUpdate} /></td>
-                    <td className="p-2 border text-center"><button onClick={() => onSelectEmployee(emp.employee_id)} className="bg-teal-500 text-white px-3 py-1 rounded text-sm hover:bg-teal-600">参照</button></td>
-                    <td className="p-2 border text-center"><button onClick={() => handleUpdate(emp)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button></td>
+                    <td className="p-2 border text-center font-semibold text-teal-600">
+                      {selectedEmployeeId === emp.employee_id ? '参照' : ''}
+                    </td>
+                    <td className="p-2 border text-center"><button onClick={(e) => { e.stopPropagation(); handleUpdate(emp); }} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button></td>
                   </tr>
                 )
               })}
@@ -272,7 +276,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                           <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
                      </select>
                   </td>
-                  <td className="p-2 border" colSpan="3"></td>
+                  <td className="p-2 border" colSpan="2"></td>
                   <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600" disabled={!auth.isOwner}>追加</button></td>
               </tr>
             </tbody>
