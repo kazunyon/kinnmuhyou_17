@@ -8,6 +8,7 @@ from flask_cors import CORS
 import sqlite3
 import uuid
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # 外部の勤怠計算モジュールをインポート
 from attendance_calculator import AttendanceCalculator
@@ -185,7 +186,7 @@ def authenticate_master():
         )
         user = cursor.fetchone()
 
-        if user and user['password'] == password:
+        if user and user['password'] and check_password_hash(user['password'], password):
             is_master = user['master_flag'] == 1
             owner_id = get_owner_id()
             is_owner = is_master and (int(employee_id) == owner_id)
@@ -720,7 +721,7 @@ def is_valid_owner(owner_id, password):
         cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (true_owner_id,))
         owner = cursor.fetchone()
 
-        if owner and owner['password'] == password:
+        if owner and owner['password'] and check_password_hash(owner['password'], password):
             app.logger.info("オーナー認証成功")
             return True
         else:
@@ -736,6 +737,9 @@ def add_employee():
 
     この操作は、リクエストに含まれる認証情報が正規のオーナーのものである
     場合にのみ許可されます。
+
+    `master_flag`がtrueの場合、新しい社員にはデフォルトのパスワードとして
+    '123'が設定されます。
 
     Request Body (JSON):
         {
@@ -761,16 +765,21 @@ def add_employee():
     try:
         db = get_db()
         cursor = db.cursor()
+
+        is_master = data.get('master_flag', False)
+        password_hash = generate_password_hash('123') if is_master else None
+
         cursor.execute("""
-            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, master_flag)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('company_id', 1),
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
             1 if data.get('retirement_flag') else 0,
-            1 if data.get('master_flag') else 0,
+            1 if is_master else 0,
+            password_hash
         ))
         db.commit()
         new_id = cursor.lastrowid
