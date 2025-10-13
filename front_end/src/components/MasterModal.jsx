@@ -233,12 +233,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
               {employees.map(emp => {
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
-                // オーナー自身の会社IDを取得
-                const ownerEmployee = employees.find(e => e.employee_id === parseInt(ownerInfo.owner_id, 10));
-                const ownerCompanyId = ownerEmployee ? ownerEmployee.company_id : null;
-
                 // 更新権限のロジック
-                const canUpdate = auth.isOwner && emp.company_id === ownerCompanyId;
+                const canUpdate = auth.isOwner && emp.employee_id === parseInt(ownerInfo.owner_id, 10);
 
                 return (
                   <tr key={emp.employee_id}
