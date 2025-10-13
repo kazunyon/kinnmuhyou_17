@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from werkzeug.security import generate_password_hash
 
 # このスクリプトの場所を基準にデータベースファイルのパスを決定
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
@@ -44,8 +45,7 @@ def init_db():
         print("会社マスターに初期データを挿入しました。")
 
         # 社員マスター
-        # パスワードはハッシュ化して保存するのがベストプラクティスですが、今回は簡単のため平文で保存します。
-        # master_flagが1のユーザーには初期パスワード'123'を設定します。
+        # master_flagが1のユーザーには、ハッシュ化された初期パスワード'123'を設定します。
         employees_definitions = [
             # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag)
             (1, 1, '中村　一真', '開発部', 'アルバイト', 0, 1),
@@ -56,8 +56,8 @@ def init_db():
 
         employees_data_to_insert = []
         for emp in employees_definitions:
-            password = '123' if emp[6] == 1 else None
-            employees_data_to_insert.append(emp + (password,))
+            password_hash = generate_password_hash('123') if emp[6] == 1 else None
+            employees_data_to_insert.append(emp + (password_hash,))
 
         cursor.executemany("""
             INSERT INTO employees
