@@ -206,14 +206,14 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
           <h3 className="text-lg font-semibold mb-3">オーナー情報</h3>
           <div className="flex items-center space-x-4">
-            <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4 flex-1">
+            <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
                 <span className="font-semibold">ID :</span>
                 <input type="text" value={ownerInfo.owner_id} disabled className="p-2 border rounded w-20 bg-gray-200" />
                 <span className="font-semibold">オーナー氏名:</span>
                 <input type="text" value={ownerInfo.owner_name} disabled className="p-2 border rounded w-48 bg-gray-200" />
-                <span className="font-semibold">パスワード:</span>
-                <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
             </fieldset>
+            <span className="font-semibold">パスワード:</span>
+            <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
             <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">認証</button>
           </div>
       </div>
