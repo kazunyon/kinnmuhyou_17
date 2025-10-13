@@ -231,11 +231,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
             <tbody>
               {employees.map(emp => {
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
-                const isRecordOfOwner = emp.employee_id === ownerInfo.owner_id;
-                const canUpdate = auth.isOwner && isRecordOfOwner;
+
+                // オーナー自身の会社IDを取得
+                const ownerEmployee = employees.find(e => e.employee_id === ownerInfo.owner_id);
+                const ownerCompanyId = ownerEmployee ? ownerEmployee.company_id : null;
+
+                // 更新権限のロジックを修正
+                const canUpdate = auth.isOwner && emp.company_id === ownerCompanyId;
 
                 return (
-                  <tr key={emp.employee_id} className={`hover:bg-gray-50 ${!canUpdate ? 'bg-gray-100' : ''}`}>
+                  <tr key={emp.employee_id} className={`hover:bg-gray-50 ${!canUpdate && emp.employee_id !== ownerInfo.owner_id ? 'bg-gray-100' : ''}`}>
                     <td className="p-2 border">{emp.employee_id}</td>
                     <td className="p-2 border">{companyName}</td>
                     <td className="p-2 border"><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
