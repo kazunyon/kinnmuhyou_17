@@ -324,6 +324,7 @@ function App() {
         onRequestClose={() => setMasterModalOpen(false)}
         onMasterUpdate={handleMasterUpdate}
         onSelectEmployee={handleEmployeeSelectInMaster}
+        selectedEmployeeId={selectedEmployeeId}
         companies={companies}
         auth={masterAuthState}
         setAuth={setMasterAuthState}

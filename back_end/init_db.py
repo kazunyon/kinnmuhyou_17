@@ -15,7 +15,7 @@ def init_db():
     2. 新しいデータベースファイルを作成し、接続します。
     3. `schema.sql` ファイルからSQLスキーマを読み込み、テーブルを作成します。
     4. `companies`, `employees`, `holidays` テーブルに初期データを挿入します。
-       - `master_flag`が1の社員には、初期パスワードとして '123' が設定されます。
+       - 全ての社員に、初期パスワードとして '123' が設定されます。
 
     Raises:
         sqlite3.Error: データベース操作中にエラーが発生した場合。
@@ -45,24 +45,22 @@ def init_db():
         print("会社マスターに初期データを挿入しました。")
 
         # 社員マスター
-        # master_flagが1のユーザーには、ハッシュ化された初期パスワード'123'を設定します。
+        # 全てのユーザーに、ハッシュ化された初期パスワード'123'を設定します。
         employees_definitions = [
-            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag)
-            (1, 1, '中村　一真', '開発部', 'アルバイト', 0, 1),
-            (2, 1, '筑紫　哲也', '研究部', '正社員', 0, 0),
-            (3, 1, '営業　よろしく', '営業部', '正社員', 0, 1),
-            (4, 1, '高市　早苗', '開発部', '正社員', 0, 0)
+            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag)
+            (1, 1, '中村　一真', '開発部', 'アルバイト', 0),
+            (2, 1, '筑紫　哲也', '研究部', '正社員', 0),
+            (3, 1, '営業　よろしく', '営業部', '正社員', 0),
+            (4, 1, '高市　早苗', '開発部', '正社員', 0)
         ]
 
-        employees_data_to_insert = []
-        for emp in employees_definitions:
-            password_hash = generate_password_hash('123')
-            employees_data_to_insert.append(emp + (password_hash,))
+        password_hash = generate_password_hash('123')
+        employees_data_to_insert = [emp + (password_hash,) for emp in employees_definitions]
 
         cursor.executemany("""
             INSERT INTO employees
-            (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """, employees_data_to_insert)
         print("社員マスターに初期データを挿入しました。")
         
