@@ -701,6 +701,19 @@ def get_owner_info():
         app.logger.error(f"オーナー情報取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+def _get_employee_company_id(employee_id):
+    """指定された社員IDが所属する会社のIDを取得します。"""
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT company_id FROM employees WHERE employee_id = ?', (employee_id,))
+        employee = cursor.fetchone()
+        if employee:
+            return employee['company_id']
+        return None
+    except Exception as e:
+        app.logger.error(f"社員の会社ID取得エラー: {e}")
+        return None
+
 def is_valid_owner(owner_id, password):
     """提供されたIDとパスワードが正規のオーナーのものであるかを検証します。
 
@@ -737,30 +750,19 @@ def add_employee():
 
     この操作は、リクエストに含まれる認証情報が正規のオーナーのものである
     場合にのみ許可されます。
-
-    `master_flag`がtrueの場合、新しい社員にはデフォルトのパスワードとして
-    '123'が設定されます。
-
-    Request Body (JSON):
-        {
-            "owner_id": int,
-            "owner_password": str,
-            "company_id": int,
-            "employee_name": str,
-            "department_name": str,
-            "employee_type": str,
-            "retirement_flag": bool,
-            "master_flag": bool
-        }
-
-    Returns:
-        Response: 追加成功メッセージと新しい社員IDを含むJSONレスポンス。
-                  権限がない場合は403、サーバーエラーの場合は500を返します。
     """
     data = request.json
+    owner_id = data.get('owner_id')
+    owner_password = data.get('owner_password')
+    target_company_id = data.get('company_id')
 
-    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+    if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
+
+    owner_company_id = _get_employee_company_id(owner_id)
+    if not owner_company_id or owner_company_id != target_company_id:
+        app.logger.warning(f"権限のない社員追加試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{target_company_id})の社員を追加しようとしました。")
+        return jsonify({"error": "自分の会社以外の社員は追加できません"}), 403
 
     try:
         db = get_db()
@@ -773,7 +775,7 @@ def add_employee():
             INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, master_flag, password)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
-            data.get('company_id', 1),
+            target_company_id,
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
@@ -794,36 +796,22 @@ def add_employee():
 def update_employee(employee_id):
     """既存の社員情報を更新します（マスターメンテナンス用）。
 
-    この操作は、正規のオーナーであり、かつオーナー自身の情報を
+    この操作は、正規のオーナーであり、かつオーナー自身の会社の社員情報を
     更新する場合にのみ許可されます。
-
-    Args:
-        employee_id (int): 更新対象の社員ID。
-
-    Request Body (JSON):
-        {
-            "owner_id": int,
-            "owner_password": str,
-            "employee_name": str,
-            "department_name": str,
-            "employee_type": str,
-            "retirement_flag": bool,
-            "master_flag": bool
-        }
-
-    Returns:
-        Response: 更新成功メッセージを含むJSONレスポンス。
-                  権限がない場合は403、サーバーエラーの場合は500を返します。
     """
     data = request.json
-    owner_id_from_request = data.get('owner_id')
+    owner_id = data.get('owner_id')
+    owner_password = data.get('owner_password')
 
-    if not is_valid_owner(owner_id_from_request, data.get('owner_password')):
+    if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    if int(owner_id_from_request) != employee_id:
-        app.logger.warning(f"権限のない更新試行: 操作者={owner_id_from_request}, 対象社員={employee_id}")
-        return jsonify({"error": "自分以外の社員情報は更新できません"}), 403
+    owner_company_id = _get_employee_company_id(owner_id)
+    employee_company_id = _get_employee_company_id(employee_id)
+
+    if not owner_company_id or owner_company_id != employee_company_id:
+        app.logger.warning(f"権限のない更新試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{employee_company_id})の社員(ID:{employee_id})を更新しようとしました。")
+        return jsonify({"error": "自分の会社以外の社員情報は更新できません"}), 403
 
     try:
         db = get_db()
