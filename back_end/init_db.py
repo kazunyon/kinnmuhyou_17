@@ -56,7 +56,7 @@ def init_db():
 
         employees_data_to_insert = []
         for emp in employees_definitions:
-            password_hash = generate_password_hash('123') if emp[6] == 1 else None
+            password_hash = generate_password_hash('123')
             employees_data_to_insert.append(emp + (password_hash,))
 
         cursor.executemany("""

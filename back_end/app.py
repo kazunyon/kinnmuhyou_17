@@ -806,12 +806,11 @@ def update_employee(employee_id):
     if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    owner_company_id = _get_employee_company_id(owner_id)
-    employee_company_id = _get_employee_company_id(employee_id)
-
-    if not owner_company_id or owner_company_id != employee_company_id:
-        app.logger.warning(f"権限のない更新試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{employee_company_id})の社員(ID:{employee_id})を更新しようとしました。")
-        return jsonify({"error": "自分の会社以外の社員情報は更新できません"}), 403
+    # ユーザーからの要求に基づき、オーナーは自分自身の情報のみ更新できるよ​​うに修正
+    # owner_id はリクエストのボディから、employee_id はURLのパスから取得
+    if int(owner_id) != employee_id:
+        app.logger.warning(f"権限のない更新試行: オーナー(ID:{owner_id})が他人(ID:{employee_id})の情報を更新しようとしました。")
+        return jsonify({"error": "この操作を行う権限がありません"}), 403
 
     try:
         db = get_db()
