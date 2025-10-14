@@ -36,7 +36,7 @@ Modal.setAppElement('#root');
  * @param {Function} props.setAuth - 親の認証状態を更新する関数。
  * @returns {JSX.Element} レンダリングされたマスターメンテナンスモーダル。
  */
-const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth }) => {
+const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, ownerId, ownerName }) => {
   /** @type {[Array<object>, Function]} 全社員リストの状態管理 */
   const [employees, setEmployees] = useState([]);
   /** @type {[object, Function]} 新規追加社員の入力データの状態管理 */
@@ -44,39 +44,35 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       company_id: companies.length > 0 ? companies[0].company_id : '',
       employee_name: '', department_name: '', employee_type: '正社員'
   });
-  /** @type {[object, Function]} オーナー情報の状態管理 */
-  const [ownerInfo, setOwnerInfo] = useState({ owner_id: '', owner_name: '' });
   /** @type {[string, Function]} パスワード入力フィールドの状態管理 */
   const [passwordInput, setPasswordInput] = useState('');
 
   /**
-   * モーダルが開いたときに初期データをフェッチし、閉じたときに状態をクリーンアップします。
+   * モーダルが開いたときに社員データをフェッチし、閉じたときに状態をクリーンアップします。
    */
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchEmployees = async () => {
       try {
-        const ownerRes = await axios.get(`${API_URL}/owner_info`);
-        setOwnerInfo(ownerRes.data);
         const employeesRes = await axios.get(`${API_URL}/employees/all`);
         setEmployees(employeesRes.data);
       } catch (error) {
-        console.error("データの取得に失敗しました:", error);
-        alert('マスターデータの取得に失敗しました。');
+        console.error("社員データの取得に失敗しました:", error);
+        alert('全社員データの取得に失敗しました。');
       }
     };
 
     if (isOpen) {
-      fetchData();
+      fetchEmployees();
     } else {
+      // モーダルが閉じるときに状態をリセット
       setPasswordInput('');
-      setOwnerInfo({ owner_id: '', owner_name: '' });
       setEmployees([]);
       setNewEmployee({
         company_id: companies.length > 0 ? companies[0].company_id : '',
         employee_name: '', department_name: '', employee_type: '正社員'
       });
     }
-  }, [isOpen, companies]);
+  }, [isOpen]);
 
   /**
    * 社員リストの入力フィールドの変更をハンドリングします。
@@ -106,13 +102,13 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
    * @async
    */
   const handleAuthenticate = async () => {
-    if (!ownerInfo.owner_id || !passwordInput) {
+    if (!ownerId || !passwordInput) {
       alert('オーナー情報が読み込まれていないか、パスワードが入力されていません。');
       return;
     }
     try {
       const res = await axios.post(`${API_URL}/master/authenticate`, {
-        employee_id: ownerInfo.owner_id,
+        employee_id: ownerId,
         password: passwordInput
       });
 
@@ -149,7 +145,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     }
     const dataToSend = {
       ...employee,
-      owner_id: ownerInfo.owner_id,
+      owner_id: ownerId,
       owner_password: auth.password,
     };
     delete dataToSend.password;
@@ -181,7 +177,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     }
     const dataToSend = {
         ...newEmployee,
-        owner_id: ownerInfo.owner_id,
+        owner_id: ownerId,
         owner_password: auth.password,
     };
     try {
@@ -208,9 +204,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
           <div className="flex items-center space-x-4">
             <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
                 <span className="font-semibold">ID :</span>
-                <input type="text" value={ownerInfo.owner_id} disabled className="p-2 border rounded w-20 bg-gray-200" />
+                <input type="text" value={ownerId || ''} disabled className="p-2 border rounded w-20 bg-gray-200" />
                 <span className="font-semibold">オーナー氏名:</span>
-                <input type="text" value={ownerInfo.owner_name} disabled className="p-2 border rounded w-48 bg-gray-200" />
+                <input type="text" value={ownerName || ''} disabled className="p-2 border rounded w-48 bg-gray-200" />
             </fieldset>
             <span className="font-semibold">パスワード:</span>
             <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
@@ -236,7 +232,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
                 // 更新権限のロジック
-                const canUpdate = auth.isOwner && emp.employee_id === parseInt(ownerInfo.owner_id, 10);
+                const canUpdate = auth.isOwner && emp.employee_id === ownerId;
 
                 return (
                   <tr key={emp.employee_id}

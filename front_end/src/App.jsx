@@ -55,6 +55,8 @@ function App() {
   const [message, setMessage] = useState('');
   /** @type {[number|null, Function]} オーナー社員IDの状態管理 */
   const [ownerId, setOwnerId] = useState(null);
+  /** @type {[string|null, Function]} オーナー社員名の状態管理 */
+  const [ownerName, setOwnerName] = useState(null);
   /** @type {[boolean, Function]} 表示中のレポートがオーナーのものかどうかの状態管理 */
   const [isViewingOwnerReport, setIsViewingOwnerReport] = useState(false);
   
@@ -94,6 +96,7 @@ function App() {
           axios.get(`${API_URL}/owner_info`),
         ]);
         setOwnerId(parseInt(ownerRes.data.owner_id, 10));
+        setOwnerName(ownerRes.data.owner_name);
         setEmployees(empRes.data);
         setCompanies(compRes.data);
       } catch (error) {
@@ -178,6 +181,28 @@ function App() {
   }, [workRecords, specialNotes, initialWorkRecords, initialSpecialNotes]);
   
   // --- イベントハンドラ ---
+
+  /**
+   * オーナー情報とマスター認証の状態をリフレッシュします。
+   * num.idが変更された後に、UIの状態を正しく同期させるために使います。
+   * @async
+   */
+  const refreshOwnerAndAuth = async () => {
+    try {
+      const ownerRes = await axios.get(`${API_URL}/owner_info`);
+      setOwnerId(parseInt(ownerRes.data.owner_id, 10));
+      setOwnerName(ownerRes.data.owner_name);
+      setMasterAuthState({
+        isAuthenticated: false,
+        isOwner: false,
+        password: '',
+        timestamp: null,
+      });
+    } catch (error) {
+      console.error("オーナー情報の再取得に失敗しました:", error);
+      setMessage("オーナー情報の更新に失敗しました。");
+    }
+  };
 
   /**
    * 作業記録と特記事項をサーバーに保存します。
@@ -321,13 +346,18 @@ function App() {
       
       <MasterModal
         isOpen={isMasterModalOpen}
-        onRequestClose={() => setMasterModalOpen(false)}
+        onRequestClose={() => {
+          refreshOwnerAndAuth();
+          setMasterModalOpen(false);
+        }}
         onMasterUpdate={handleMasterUpdate}
         onSelectEmployee={handleEmployeeSelectInMaster}
         selectedEmployeeId={selectedEmployeeId}
         companies={companies}
         auth={masterAuthState}
         setAuth={setMasterAuthState}
+        ownerId={ownerId}
+        ownerName={ownerName}
       />
 
       <DailyReportListModal
