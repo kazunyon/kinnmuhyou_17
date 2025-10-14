@@ -29,9 +29,10 @@ const modalStyles = {
  * @param {string} props.date - 対象の日付 ('YYYY-MM-DD')。
  * @param {object} props.workRecord - 対象日の作業記録オブジェクト。
  * @param {Function} props.onSave - 時間や作業内容の変更を親コンポーネントに通知するコールバック関数。
+ * @param {Function} props.onReportUpdate - 日報の更新を親コンポーネントに通知するコールバック関数。
  * @returns {JSX.Element} レンダリングされたモーダルコンポーネント。
  */
-const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, date, workRecord, onSave }) => {
+const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, date, workRecord, onSave, onReportUpdate }) => {
   /** @type {[object, Function]} 日報のテキストデータの状態管理 */
   const [reportData, setReportData] = useState({
     work_summary: '', problems: '', challenges: '', tomorrow_tasks: '', thoughts: ''
@@ -118,6 +119,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
           work_content: reportData.work_summary,
       });
 
+      onReportUpdate(true);
       onRequestClose();
     } catch (error) {
       console.error("日報データの保存に失敗しました:", error);
