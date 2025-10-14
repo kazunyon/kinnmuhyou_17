@@ -595,6 +595,8 @@ def save_daily_report():
     """日報データを保存（UPSERT）します。
 
     データが存在しない場合は新規作成、存在する場合は更新します。
+    関連する作業記録（work_records）の作業内容（work_content）も同時に更新し、
+    データの一貫性を保証します。
 
     Request Body (JSON):
         {
@@ -621,6 +623,8 @@ def save_daily_report():
     try:
         db = get_db()
         cursor = db.cursor()
+
+        # 1. daily_reports テーブルを更新または挿入
         cursor.execute("SELECT 1 FROM daily_reports WHERE employee_id = ? AND date = ?", (employee_id, date))
         exists = cursor.fetchone()
 
@@ -644,8 +648,25 @@ def save_daily_report():
                 data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')
             ))
         
+        # 2. work_records テーブルの work_content も一貫性のために更新または挿入
+        work_summary = data.get('work_summary')
+        cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
+        work_record = cursor.fetchone()
+
+        if work_record:
+            cursor.execute(
+                "UPDATE work_records SET work_content = ? WHERE record_id = ?",
+                (work_summary, work_record['record_id'])
+            )
+        else:
+            # work_recordsに該当日のレコードがない場合、日報の作業内容で新規作成
+            cursor.execute(
+                "INSERT INTO work_records (employee_id, date, work_content) VALUES (?, ?, ?)",
+                (employee_id, date, work_summary)
+            )
+
         db.commit()
-        app.logger.info(f"日報データ保存成功: 社員ID={employee_id}, 日付={date}")
+        app.logger.info(f"日報データ保存成功 (work_recordsも更新): 社員ID={employee_id}, 日付={date}")
         return jsonify({"message": "日報を保存しました"}), 200
     except Exception as e:
         db.rollback()

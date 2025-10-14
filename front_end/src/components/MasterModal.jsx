@@ -72,7 +72,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         employee_name: '', department_name: '', employee_type: '正社員'
       });
     }
-  }, [isOpen]);
+  }, [isOpen, companies]);
 
   /**
    * 社員リストの入力フィールドの変更をハンドリングします。
@@ -193,8 +193,6 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         alert(error.response?.data?.error || '追加に失敗しました。');
     }
   };
-
-  const ownerEmployee = employees.find(e => e.employee_id === ownerId);
 
   return (
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="マスターメンテナンス">
