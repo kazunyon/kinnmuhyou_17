@@ -100,17 +100,29 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
 
   /**
    * 「適用して閉じる」ボタンのハンドラ。
-   * 親コンポーネントに変更を通知し、モーダルを閉じます。DBへの保存は行いません。
+   * 日報データをDBに保存し、親コンポーネントに変更を通知してからモーダルを閉じます。
    */
-  const handleApplyAndClose = () => {
-    onSave({
-        day: new Date(date).getDate(),
-        start_time: times.startTime,
-        end_time: times.endTime,
-        break_time: times.breakTime,
-        work_content: reportData.work_summary,
-    });
-    onRequestClose();
+  const handleApplyAndClose = async () => {
+    try {
+      await axios.post(`${API_URL}/daily_report`, {
+        employee_id: employeeId,
+        date: date,
+        ...reportData
+      });
+
+      onSave({
+          day: new Date(date).getDate(),
+          start_time: times.startTime,
+          end_time: times.endTime,
+          break_time: times.breakTime,
+          work_content: reportData.work_summary,
+      });
+
+      onRequestClose();
+    } catch (error) {
+      console.error("日報データの保存に失敗しました:", error);
+      alert("日報データの保存に失敗しました。");
+    }
   };
 
   /**
