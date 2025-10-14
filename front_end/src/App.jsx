@@ -93,7 +93,7 @@ function App() {
           axios.get(`${API_URL}/companies`),
           axios.get(`${API_URL}/owner_info`),
         ]);
-        setOwnerId(ownerRes.data.owner_id);
+        setOwnerId(parseInt(ownerRes.data.owner_id, 10));
         setEmployees(empRes.data);
         setCompanies(compRes.data);
       } catch (error) {
