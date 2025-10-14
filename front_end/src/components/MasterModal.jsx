@@ -234,7 +234,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
                 // 更新権限のロジック
-                const canUpdate = auth.isOwner && ownerEmployee && emp.company_id === ownerEmployee.company_id;
+                const canUpdate = auth.isOwner && emp.employee_id === ownerId;
 
                 return (
                   <tr key={emp.employee_id}
