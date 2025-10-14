@@ -194,6 +194,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     }
   };
 
+  const ownerEmployee = employees.find(e => e.employee_id === ownerId);
+
   return (
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="マスターメンテナンス">
       <h2 className="text-xl font-bold text-center mb-6">マスターメンテナンス</h2>
@@ -232,7 +234,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
                 // 更新権限のロジック
-                const canUpdate = auth.isOwner;
+                const canUpdate = auth.isOwner && ownerEmployee && emp.company_id === ownerEmployee.company_id;
 
                 return (
                   <tr key={emp.employee_id}
