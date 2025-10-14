@@ -287,9 +287,10 @@ function App() {
    * 5分間の認証タイムアウトをチェックします。
    */
   const handleOpenMaster = () => {
-    const fiveMinutes = 5 * 60 * 1000;
+/*    const fiveMinutes = 5 * 60 * 1000; */
+    const fiveMinutes = 0.1 * 60 * 1000;
     if (masterAuthState.timestamp && (new Date().getTime() - masterAuthState.timestamp > fiveMinutes)) {
-      alert('認証の有効期限が切れました。再度認証してください。');
+      /* alert('認証の有効期限が切れました。再度認証してください。'); */
       setMasterAuthState({ isAuthenticated: false, isOwner: false, password: '', timestamp: null });
     }
     setMasterModalOpen(true);
