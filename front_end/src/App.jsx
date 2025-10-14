@@ -48,6 +48,8 @@ function App() {
   const [initialSpecialNotes, setInitialSpecialNotes] = useState("");
   /** @type {[boolean, Function]} 作業報告書画面が変更されたかどうかの状態管理 */
   const [isReportScreenDirty, setIsReportScreenDirty] = useState(false);
+  /** @type {[boolean, Function]} 日報が更新されたかどうかの状態管理 */
+  const [hasDailyReportBeenUpdated, setHasDailyReportBeenUpdated] = useState(false);
 
   /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
   const [isLoading, setIsLoading] = useState(true);
@@ -149,6 +151,7 @@ function App() {
         setInitialSpecialNotes(newSpecialNotes);
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
+        setHasDailyReportBeenUpdated(false);
         
       } catch (error) {
         console.error("作業記録の取得に失敗しました:", error);
@@ -176,9 +179,10 @@ function App() {
   useEffect(() => {
     const isDirty =
       JSON.stringify(workRecords) !== JSON.stringify(initialWorkRecords) ||
-      specialNotes !== initialSpecialNotes;
+      specialNotes !== initialSpecialNotes ||
+      hasDailyReportBeenUpdated;
     setIsReportScreenDirty(isDirty);
-  }, [workRecords, specialNotes, initialWorkRecords, initialSpecialNotes]);
+  }, [workRecords, specialNotes, initialWorkRecords, initialSpecialNotes, hasDailyReportBeenUpdated]);
   
   // --- イベントハンドラ ---
 
@@ -226,6 +230,7 @@ function App() {
       setInitialWorkRecords(workRecords);
       setInitialSpecialNotes(specialNotes);
       setIsReportScreenDirty(false);
+      setHasDailyReportBeenUpdated(false);
 
       setTimeout(() => setMessage(''), 3000);
     } catch (error) {
@@ -343,6 +348,7 @@ function App() {
             );
             setWorkRecords(updatedRecords);
         }}
+        onReportUpdate={setHasDailyReportBeenUpdated}
       />
       
       <MasterModal
