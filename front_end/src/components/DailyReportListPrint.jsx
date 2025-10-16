@@ -3,6 +3,16 @@ import React from 'react';
 const DailyReportListPrint = React.forwardRef((props, ref) => {
   const { reports, year, month } = props;
 
+  const getRowClassName = (report) => {
+    if (report.isHoliday || report.dayOfWeek === '日') {
+      return 'bg-red-100 align-top';
+    }
+    if (report.dayOfWeek === '土') {
+      return 'bg-blue-100 align-top';
+    }
+    return 'align-top';
+  };
+
   if (!reports || reports.length === 0) {
     return null;
   }
@@ -25,7 +35,7 @@ const DailyReportListPrint = React.forwardRef((props, ref) => {
         </thead>
         <tbody>
           {reports.map((report) => (
-            <tr key={report.date} className="align-top">
+            <tr key={report.date} className={getRowClassName(report)}>
               <td className="p-2 border border-black text-center">{report.date}</td>
               <td className="p-2 border border-black text-center">{report.dayOfWeek}</td>
               <td className="p-2 border border-black text-center">{report.workTime}</td>

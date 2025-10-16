@@ -37,6 +37,8 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
   const [reports, setReports] = useState([]);
   /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
   const [isLoading, setIsLoading] = useState(false);
+  /** @type {[object, Function]} 祝日データの状態管理 */
+  const [holidays, setHolidays] = useState({});
 
   /** @type {React.MutableRefObject<undefined>} 印刷用コンポーネントへの参照 */
   const printComponentRef = useRef();
@@ -66,12 +68,16 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
             axios.get(`${API_URL}/daily_report/${employeeId}/${date}`)
           );
           const workRecordPromise = axios.get(`${API_URL}/work_records/${employeeId}/${year}/${month}`);
+          const holidayPromise = axios.get(`${API_URL}/holidays/${year}`);
           
-          const [reportResponses, workRecordResponse] = await Promise.all([
+          const [reportResponses, workRecordResponse, holidayResponse] = await Promise.all([
               Promise.all(reportPromises),
-              workRecordPromise
+              workRecordPromise,
+              holidayPromise
           ]);
 
+          const holidaysData = holidayResponse.data;
+          setHolidays(holidaysData);
           const workRecordsMap = new Map(workRecordResponse.data.records.map(r => [r.day, r]));
 
           const combinedData = dateList.map((dateStr, i) => {
@@ -83,9 +89,12 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
             
             const workMinutes = calculateWorkMinutes(workRecord?.start_time, workRecord?.end_time, workRecord?.break_time);
 
+            const isHoliday = !!holidaysData[dateStr];
+
             return {
               date: day,
               dayOfWeek: weekdays[getDay(dateObj)],
+              isHoliday,
               workTime: minutesToTime(workMinutes),
               work_summary: workRecord?.work_content || report?.work_summary || '',
               problems: report?.problems || '',
@@ -105,6 +114,21 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
       fetchReports();
     }
   }, [isOpen, employeeId, year, month]);
+
+  /**
+   * レポートデータに基づいてテーブル行のCSSクラス名を返します。
+   * @param {object} report - 表示するレポートオブジェクト。
+   * @returns {string} Tailwind CSSのクラス名。
+   */
+  const getRowClassName = (report) => {
+    if (report.isHoliday || report.dayOfWeek === '日') {
+      return 'bg-red-100 hover:bg-red-200 align-top';
+    }
+    if (report.dayOfWeek === '土') {
+      return 'bg-blue-100 hover:bg-blue-200 align-top';
+    }
+    return 'hover:bg-gray-50 align-top';
+  };
 
   return (
     <>
@@ -130,7 +154,7 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
                 </thead>
                 <tbody>
                   {reports.map((report) => (
-                    <tr key={report.date} className="hover:bg-gray-50 align-top">
+                    <tr key={report.date} className={getRowClassName(report)}>
                       <td className="p-2 border text-center">{report.date}</td>
                       <td className="p-2 border text-center">{report.dayOfWeek}</td>
                       <td className="p-2 border text-center">{report.workTime}</td>
