@@ -68,34 +68,36 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
    * @param {string} value - 新しい値
    */
   const handleInputChange = (dayIndex, field, value) => {
-    const updatedRecords = [...workRecords];
-    const record = { ...updatedRecords[dayIndex] };
+    onWorkRecordsChange(prevRecords => {
+      const updatedRecords = [...prevRecords];
+      const record = { ...updatedRecords[dayIndex] };
 
-    // 更新したレコードの値を設定
-    record[field] = value;
+      // 更新したレコードの値を設定
+      record[field] = value;
 
-    // もし作業内容が「休み」と入力されたら、関連する時間を0にする
-    if (field === 'work_content' && value.trim() === '休み') {
-      record.start_time = '00:00';
-      record.end_time = '00:00';
-      record.break_time = '00:00';
-    } else if (field === 'start_time' || field === 'end_time' || field === 'break_time') {
-      // 時間入力の場合、値を15分刻みに丸める
-      if (value) {
-        const [h, m] = value.split(':');
-        const minutes = parseInt(m, 10);
-        const roundedMinutes = Math.round(minutes / 15) * 15;
-        if (roundedMinutes === 60) {
-          const hours = parseInt(h, 10) + 1;
-          record[field] = `${String(hours).padStart(2,'0')}:00`;
-        } else {
-          record[field] = `${h}:${String(roundedMinutes).padStart(2, '0')}`;
+      // もし作業内容が「休み」と入力されたら、関連する時間を0にする
+      if (field === 'work_content' && value.trim() === '休み') {
+        record.start_time = '00:00';
+        record.end_time = '00:00';
+        record.break_time = '00:00';
+      } else if (field === 'start_time' || field === 'end_time' || field === 'break_time') {
+        // 時間入力の場合、値を15分刻みに丸める
+        if (value) {
+          const [h, m] = value.split(':');
+          const minutes = parseInt(m, 10);
+          const roundedMinutes = Math.round(minutes / 15) * 15;
+          if (roundedMinutes === 60) {
+            const hours = parseInt(h, 10) + 1;
+            record[field] = `${String(hours).padStart(2,'0')}:00`;
+          } else {
+            record[field] = `${h}:${String(roundedMinutes).padStart(2, '0')}`;
+          }
         }
       }
-    }
-    
-    updatedRecords[dayIndex] = record;
-    onWorkRecordsChange(updatedRecords);
+
+      updatedRecords[dayIndex] = record;
+      return updatedRecords;
+    });
   };
   
   // --- レンダリング前の合計時間計算 ---
