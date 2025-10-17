@@ -512,15 +512,33 @@ def save_attendance_records():
             )
             record_row = cursor.fetchone()
 
+            # リクエストから送られてきた勤怠種別を取得
+            attendance_type = record.get('attendance_type')
+
+            # 全日休みの勤怠種別リスト (2:欠勤, 3:有給, 6:代休, 7:振休)
+            full_day_off_types = [2, 3, 6, 7]
+
+            # 勤怠種別が全日休みの場合、時刻関連のデータを強制的に "00:00" にする
+            if attendance_type in full_day_off_types:
+                start_time = "00:00"
+                end_time = "00:00"
+                break_time = "00:00"
+                night_break_time = "00:00"
+            else:
+                start_time = record.get('start_time')
+                end_time = record.get('end_time')
+                break_time = record.get('break_time')
+                night_break_time = record.get('night_break_time')
+
             params = {
                 'employee_id': employee_id,
                 'date': date_str,
                 'holiday_type': record.get('holiday_type'),
-                'attendance_type': record.get('attendance_type'),
-                'start_time': record.get('start_time'),
-                'end_time': record.get('end_time'),
-                'break_time': record.get('break_time'),
-                'night_break_time': record.get('night_break_time'),
+                'attendance_type': attendance_type,
+                'start_time': start_time,
+                'end_time': end_time,
+                'break_time': break_time,
+                'night_break_time': night_break_time,
                 'work_content': record.get('remarks')
             }
 
