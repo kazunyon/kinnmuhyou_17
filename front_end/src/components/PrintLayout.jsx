@@ -17,7 +17,7 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
-  const { employee, company, currentDate, workRecords, holidays } = props;
+  const { employee, company, currentDate, workRecords, holidays, specialNotes } = props;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -131,7 +131,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
             </tr>
             <tr>
                 <td className="border border-black p-1 align-top" rowSpan="4">特記事項</td>
-                <td className="p-1 align-top border-t border-r border-black" colSpan="3" rowSpan="4" style={{ height: '112px' }}></td>
+                <td className="p-1 align-top border-t border-r border-black whitespace-pre-wrap" colSpan="3" rowSpan="4" style={{ height: '112px' }}>{specialNotes}</td>
             </tr>
             {Array.from({ length: 3 }).map((_, i) => (
                 <tr key={`note-fill-${i}`} className="hidden">

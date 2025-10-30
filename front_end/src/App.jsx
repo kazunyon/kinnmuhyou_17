@@ -383,6 +383,7 @@ function App() {
           currentDate={currentDate}
           workRecords={workRecords}
           holidays={holidays}
+          specialNotes={specialNotes}
         />
       </div>
     </div>
