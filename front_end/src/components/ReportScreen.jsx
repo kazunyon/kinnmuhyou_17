@@ -112,16 +112,25 @@ const ReportScreen = ({
         </div>
       </header>
 
-      {/* 社員情報 */}
-      <div className="mb-4 space-y-1 text-10pt">
-        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
-          <span className="inline-block w-14">会社名</span>：{company?.company_name || ''}
+      {/* 社員情報と印鑑欄 */}
+      <div className="flex justify-between items-start mb-4">
+        {/* 社員情報 */}
+        <div className="space-y-1 text-10pt">
+          <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+            <span className="inline-block w-14">会社名</span>：{company?.company_name || ''}
+          </div>
+          <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+            <span className="inline-block w-14">部署</span>：{selectedEmployee?.department_name || ''}
+          </div>
+          <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
+            <span className="inline-block w-14">氏名</span>：{selectedEmployee?.employee_name || ''}
+          </div>
         </div>
-        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
-          <span className="inline-block w-14">部署</span>：{selectedEmployee?.department_name || ''}
-        </div>
-        <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
-          <span className="inline-block w-14">氏名</span>：{selectedEmployee?.employee_name || ''}
+
+        {/* 印鑑欄 */}
+        <div className="flex flex-col text-10pt" style={{ width: '100pt', height: '50pt', border: '1px solid black' }}>
+          <div className="text-center border-b border-black h-1/3 flex-none">印鑑</div>
+          <div className="grow"></div>
         </div>
       </div>
 
