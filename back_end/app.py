@@ -11,7 +11,7 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # 外部の勤怠計算モジュールをインポート
-from .attendance_calculator import AttendanceCalculator
+from attendance_calculator import AttendanceCalculator
 
 # -----------------------------------------------------------------------------
 # アプリケーション設定
