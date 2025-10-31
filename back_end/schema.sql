@@ -55,6 +55,7 @@ CREATE TABLE monthly_reports (
     year INTEGER NOT NULL,
     month INTEGER NOT NULL,
     special_notes TEXT,
+    approval_date TEXT, -- 承認日 (YYYY-MM-DD)
     UNIQUE(employee_id, year, month),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );

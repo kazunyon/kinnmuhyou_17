@@ -41,8 +41,9 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
+  approvalDate, ownerName,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
-  onSave, onPrint, onOpenDailyReportList, onOpenMaster, onRowClick
+  onSave, onPrint, onApprove, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
   /**
@@ -130,7 +131,17 @@ const ReportScreen = ({
         {/* 印鑑欄 */}
         <div className="flex flex-col text-10pt" style={{ width: '100pt', height: '50pt', border: '1px solid black' }}>
           <div className="text-center border-b border-black h-1/3 flex-none">印鑑</div>
-          <div className="grow"></div>
+          <div
+            className={`grow flex items-center justify-center ${!isReadOnly && !approvalDate ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+            onClick={!isReadOnly && !approvalDate ? onApprove : undefined}
+          >
+            {approvalDate ? (
+              <div className="text-red-500 text-center">
+                <p>{ownerName?.split('　')[0] || ''}</p>
+                <p>{new Date(approvalDate).getMonth() + 1}/{new Date(approvalDate).getDate()}</p>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
