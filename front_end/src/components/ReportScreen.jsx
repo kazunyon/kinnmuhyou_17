@@ -96,19 +96,28 @@ const ReportScreen = ({
           {isReportScreenDirty && <span className="text-red-500 ml-4 text-sm">(更新あり)</span>}
         </h1>
 
-        {/* 操作ボタン */}
-        <div className="flex justify-end items-center space-x-2">
-            {message && <div className="text-green-600 mr-4">{message}</div>}
-            <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
-            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
-            <button
-              onClick={onSave}
-              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-              disabled={isReadOnly}
-            >
-              保存
-            </button>
-            <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+        {/* 操作ボタン & 印鑑欄 */}
+        <div className="flex flex-col items-end space-y-1">
+            {/* 操作ボタン */}
+            <div className="flex justify-end items-center space-x-2">
+                {message && <div className="text-green-600 mr-4">{message}</div>}
+                <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
+                <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
+                <button
+                  onClick={onSave}
+                  className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                  disabled={isReadOnly}
+                >
+                  保存
+                </button>
+                <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+            </div>
+            {/* 印鑑欄 */}
+            <div className="flex flex-col items-center pt-1">
+              <span className="text-sm">印鑑</span>
+              <div className="border border-black" style={{ width: '100pt', height: '50pt' }}>
+              </div>
+            </div>
         </div>
       </header>
 
