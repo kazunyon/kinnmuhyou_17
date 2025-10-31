@@ -41,6 +41,8 @@ function App() {
   const [holidays, setHolidays] = useState({});
   /** @type {[string, Function]} 月次の特記事項の状態管理 */
   const [specialNotes, setSpecialNotes] = useState("");
+  /** @type {[string|null, Function]} 承認日の状態管理 */
+  const [approvalDate, setApprovalDate] = useState(null);
 
   /** @type {[Array<object>, Function]} 作業記録の初期状態 */
   const [initialWorkRecords, setInitialWorkRecords] = useState([]);
@@ -144,11 +146,13 @@ function App() {
         });
 
         const newSpecialNotes = recordsRes.data.special_notes || "";
+        const fetchedApprovalDate = recordsRes.data.approval_date || null;
 
         setWorkRecords(newRecords);
         setInitialWorkRecords(newRecords);
         setSpecialNotes(newSpecialNotes);
         setInitialSpecialNotes(newSpecialNotes);
+        setApprovalDate(fetchedApprovalDate);
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
         setHasDailyReportBeenUpdated(false);
@@ -240,6 +244,35 @@ function App() {
   };
 
   /**
+   * 作業報告書を承認します。
+   * @async
+   */
+  const handleApprove = async () => {
+    if (isReportScreenDirty) {
+      alert('変更が保存されていません。先に保存してください。');
+      return;
+    }
+    if (window.confirm('この報告書を承認しますか？')) {
+      try {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1;
+        const payload = {
+          employee_id: selectedEmployeeId,
+          year,
+          month,
+        };
+        const response = await axios.post(`${API_URL}/monthly_reports/approve`, payload);
+        setApprovalDate(response.data.approval_date);
+        setMessage(response.data.message);
+        setTimeout(() => setMessage(''), 3000);
+      } catch (error) {
+        console.error("承認に失敗しました:", error);
+        setMessage(error.response?.data?.error || "承認に失敗しました。");
+      }
+    }
+  };
+
+  /**
    * 印刷ダイアログをトリガーする関数。
    */
   const handlePrint = useReactToPrint({
@@ -322,10 +355,13 @@ function App() {
         message={message}
         isReadOnly={!isViewingOwnerReport}
         isReportScreenDirty={isReportScreenDirty}
+        approvalDate={approvalDate}
+        ownerName={ownerName}
         onDateChange={handleChangeDate}
         onWorkRecordsChange={setWorkRecords}
         onSpecialNotesChange={setSpecialNotes}
         onSave={handleSave}
+        onApprove={handleApprove}
         onPrint={handlePrint}
         onOpenDailyReportList={() => setDailyReportListModalOpen(true)}
         onOpenMaster={handleOpenMaster}

@@ -41,8 +41,9 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
-  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
-  onSave, onPrint, onOpenDailyReportList, onOpenMaster, onRowClick
+  isLoading, message, isReadOnly, isReportScreenDirty, approvalDate, ownerName,
+  onDateChange, onWorkRecordsChange, onSpecialNotesChange,
+  onSave, onPrint, onApprove, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
   /**
@@ -122,6 +123,35 @@ const ReportScreen = ({
         </div>
         <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
           <span className="inline-block w-14">氏名</span>：{selectedEmployee?.employee_name || ''}
+        </div>
+      </div>
+
+      {/* 印鑑欄 */}
+      <div className="absolute top-28 right-4 flex space-x-2">
+        <div className="w-24 h-24 border-2 border-gray-400 flex flex-col items-center justify-center text-center">
+          <span className="text-xs">担当</span>
+          <div className="h-16"></div>
+        </div>
+        <div className="w-24 h-24 border-2 border-gray-400 flex flex-col items-center justify-center text-center">
+          <span className="text-xs">承認</span>
+          {approvalDate ? (
+            <div className="text-red-500 font-bold h-16 flex flex-col items-center justify-center">
+              <span>{ownerName}</span>
+              <span>{`${new Date(approvalDate).getMonth() + 1}/${new Date(approvalDate).getDate()}`}</span>
+            </div>
+          ) : (
+            isReadOnly ? (
+              <div className="h-16"></div>
+            ) : (
+              <button
+                onClick={onApprove}
+                className="w-full h-16 text-gray-400 hover:bg-gray-100"
+                aria-label="承認する"
+              >
+                (クリック)
+              </button>
+            )
+          )}
         </div>
       </div>
 
