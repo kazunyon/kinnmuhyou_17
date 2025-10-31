@@ -129,7 +129,7 @@ const ReportScreen = ({
 
         {/* 印鑑欄 */}
         <div className="flex">
-          <div className="border-black border text-center" style={{width: '240px', height: '80px'}}>
+          <div className="border-black border text-center" style={{width: '120px', height: '80px'}}>
             <div className="border-black border-b h-5 text-10pt leading-5">印鑑</div>
             <div className="h-15"></div>
           </div>
