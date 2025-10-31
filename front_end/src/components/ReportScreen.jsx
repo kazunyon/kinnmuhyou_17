@@ -109,6 +109,15 @@ const ReportScreen = ({
               保存
             </button>
             <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+
+            {/* 承認印欄 */}
+            <div className="ml-4" style={{ border: '2px solid red', width: '120px', height: '60px', display: 'flex', flexDirection: 'column' }}>
+              <div className="text-center" style={{ padding: '2px', borderBottom: '1px solid black', fontSize: '12px' }}>
+                印鑑
+              </div>
+              <div className="flex-grow">
+              </div>
+            </div>
         </div>
       </header>
 
