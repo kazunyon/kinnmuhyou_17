@@ -97,18 +97,36 @@ const ReportScreen = ({
         </h1>
 
         {/* 操作ボタン */}
-        <div className="flex justify-end items-center space-x-2">
-            {message && <div className="text-green-600 mr-4">{message}</div>}
-            <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
-            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
-            <button
-              onClick={onSave}
-              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-              disabled={isReadOnly}
-            >
-              保存
-            </button>
-            <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+        <div className="flex justify-end items-start space-x-2">
+          <div className="flex items-center space-x-2">
+              {message && <div className="text-green-600 mr-4">{message}</div>}
+              <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
+              <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
+              <button
+                onClick={onSave}
+                className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                disabled={isReadOnly}
+              >
+                保存
+              </button>
+              <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+          </div>
+
+          {/* 印鑑欄 */}
+          <div className="ml-4">
+            <table className="border-collapse border border-black">
+              <tbody>
+                <tr>
+                  <td colSpan="3" className="border border-black text-center text-xs py-1">印鑑</td>
+                </tr>
+                <tr>
+                  <td className="border border-black h-12 w-12"></td>
+                  <td className="border border-black h-12 w-12"></td>
+                  <td className="border border-black h-12 w-12"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </header>
 
