@@ -76,7 +76,7 @@ const ReportScreen = ({
 
   return (
     <div className="container mx-auto p-4 bg-white shadow-lg rounded-lg">
-      <header className="grid grid-cols-3 items-center mb-4">
+      <header className="grid grid-cols-3 items-start mb-4">
         {/* 年月選択 */}
         <div className="flex items-center space-x-2">
            <select value={currentDate.getFullYear()} onChange={handleYearChange} className="p-1 border rounded">
@@ -96,27 +96,38 @@ const ReportScreen = ({
           {isReportScreenDirty && <span className="text-red-500 ml-4 text-sm">(更新あり)</span>}
         </h1>
 
-        {/* 操作ボタン */}
-        <div className="flex justify-end items-center space-x-2">
-            {message && <div className="text-green-600 mr-4">{message}</div>}
-            <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
-            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
-            <button
-              onClick={onSave}
-              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-              disabled={isReadOnly}
-            >
-              保存
-            </button>
-            <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
-
-            {/* 承認印欄 */}
-            <div className="ml-4" style={{ border: '2px solid red', width: '120px', height: '60px', display: 'flex', flexDirection: 'column' }}>
-              <div className="text-center" style={{ padding: '2px', borderBottom: '1px solid black', fontSize: '12px' }}>
-                印鑑
-              </div>
-              <div className="flex-grow">
-              </div>
+        {/* 操作ボタンと印鑑欄 */}
+        <div className="flex justify-end items-start">
+            {/* 操作ボタン */}
+            <div className="flex items-center space-x-2">
+                {message && <div className="text-green-600 mr-4">{message}</div>}
+                <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
+                <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
+                <button
+                  onClick={onSave}
+                  className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
+                  disabled={isReadOnly}
+                >
+                  保存
+                </button>
+                <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+            </div>
+            {/* 印鑑欄 */}
+            <div className="ml-4">
+              <table className="border-collapse border border-black">
+                <thead>
+                  <tr>
+                    <th colSpan="3" className="border border-black px-2 py-1 text-center font-normal" style={{ fontSize: '10pt' }}>印鑑</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-black h-12 w-12"></td>
+                    <td className="border border-black h-12 w-12"></td>
+                    <td className="border border-black h-12 w-12"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
         </div>
       </header>
