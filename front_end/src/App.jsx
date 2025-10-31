@@ -41,11 +41,15 @@ function App() {
   const [holidays, setHolidays] = useState({});
   /** @type {[string, Function]} 月次の特記事項の状態管理 */
   const [specialNotes, setSpecialNotes] = useState("");
+  /** @type {[string|null, Function]} 承認日の状態管理 */
+  const [approvalDate, setApprovalDate] = useState(null);
 
   /** @type {[Array<object>, Function]} 作業記録の初期状態 */
   const [initialWorkRecords, setInitialWorkRecords] = useState([]);
   /** @type {[string, Function]} 特記事項の初期状態 */
   const [initialSpecialNotes, setInitialSpecialNotes] = useState("");
+  /** @type {[string|null, Function]} 承認日の初期状態 */
+  const [initialApprovalDate, setInitialApprovalDate] = useState(null);
   /** @type {[boolean, Function]} 作業報告書画面が変更されたかどうかの状態管理 */
   const [isReportScreenDirty, setIsReportScreenDirty] = useState(false);
   /** @type {[boolean, Function]} 日報が更新されたかどうかの状態管理 */
@@ -144,11 +148,14 @@ function App() {
         });
 
         const newSpecialNotes = recordsRes.data.special_notes || "";
+        const newApprovalDate = recordsRes.data.approval_date || null;
 
         setWorkRecords(newRecords);
         setInitialWorkRecords(newRecords);
         setSpecialNotes(newSpecialNotes);
         setInitialSpecialNotes(newSpecialNotes);
+        setApprovalDate(newApprovalDate);
+        setInitialApprovalDate(newApprovalDate);
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
         setHasDailyReportBeenUpdated(false);
@@ -180,9 +187,10 @@ function App() {
     const isDirty =
       JSON.stringify(workRecords) !== JSON.stringify(initialWorkRecords) ||
       specialNotes !== initialSpecialNotes ||
+      approvalDate !== initialApprovalDate ||
       hasDailyReportBeenUpdated;
     setIsReportScreenDirty(isDirty);
-  }, [workRecords, specialNotes, initialWorkRecords, initialSpecialNotes, hasDailyReportBeenUpdated]);
+  }, [workRecords, specialNotes, approvalDate, initialWorkRecords, initialSpecialNotes, initialApprovalDate, hasDailyReportBeenUpdated]);
   
   // --- イベントハンドラ ---
 
@@ -229,6 +237,7 @@ function App() {
       // 保存が成功したので、初期状態を現在の状態に更新し、dirtyフラグをリセット
       setInitialWorkRecords(workRecords);
       setInitialSpecialNotes(specialNotes);
+      setInitialApprovalDate(approvalDate);
       setIsReportScreenDirty(false);
       setHasDailyReportBeenUpdated(false);
 
@@ -245,6 +254,35 @@ function App() {
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
   });
+
+  /**
+   * 月次レポートを承認します。
+   * @async
+   */
+  const handleApprove = async () => {
+    if (isReportScreenDirty) {
+      alert('変更が保存されていません。先に保存してください。');
+      return;
+    }
+    if (window.confirm('この報告書を承認しますか？')) {
+      try {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1;
+        const payload = {
+          employee_id: selectedEmployeeId,
+          year,
+          month,
+        };
+        const response = await axios.post(`${API_URL}/monthly_reports/approve`, payload);
+        setApprovalDate(response.data.approval_date);
+        setMessage(response.data.message);
+        setTimeout(() => setMessage(''), 3000);
+      } catch (error) {
+        console.error("承認に失敗しました:", error);
+        setMessage(error.response?.data?.error || "承認に失敗しました。");
+      }
+    }
+  };
 
   /**
    * 年月が変更されたときのハンドラ。
@@ -318,6 +356,8 @@ function App() {
         workRecords={workRecords}
         holidays={holidays}
         specialNotes={specialNotes}
+        approvalDate={approvalDate}
+        ownerName={ownerName}
         isLoading={isLoading}
         message={message}
         isReadOnly={!isViewingOwnerReport}
@@ -327,6 +367,7 @@ function App() {
         onSpecialNotesChange={setSpecialNotes}
         onSave={handleSave}
         onPrint={handlePrint}
+        onApprove={handleApprove}
         onOpenDailyReportList={() => setDailyReportListModalOpen(true)}
         onOpenMaster={handleOpenMaster}
         onRowClick={(record) => {

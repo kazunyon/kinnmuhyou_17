@@ -281,14 +281,20 @@ def get_work_records(employee_id, year, month):
         records = [dict(row) for row in records_cursor.fetchall()]
 
         notes_cursor = db.execute("""
-            SELECT special_notes FROM monthly_reports
+            SELECT special_notes, approval_date FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
         """, (employee_id, year, month))
-        notes_row = notes_cursor.fetchone()
-        special_notes = notes_row['special_notes'] if notes_row else ""
+        report_row = notes_cursor.fetchone()
+
+        special_notes = report_row['special_notes'] if report_row else ""
+        approval_date = report_row['approval_date'] if report_row else None
 
         app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records)}件")
-        return jsonify({"records": records, "special_notes": special_notes})
+        return jsonify({
+            "records": records,
+            "special_notes": special_notes,
+            "approval_date": approval_date
+        })
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
@@ -391,6 +397,61 @@ def save_work_records():
         db.rollback()
         app.logger.error(f"作業記録保存エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/monthly_reports/approve', methods=['POST'])
+def approve_monthly_report():
+    """月次レポートを承認し、承認日を記録します。
+
+    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
+    もし対象の年月に月次レポートが存在しない場合は、このタイミングで新規作成します。
+
+    Request Body (JSON):
+        {
+            "employee_id": int,
+            "year": int,
+            "month": int
+        }
+    """
+    data = request.json
+    employee_id = data.get('employee_id')
+    year = data.get('year')
+    month = data.get('month')
+
+    if not all([employee_id, year, month]):
+        return jsonify({"error": "無効なデータです"}), 400
+
+    owner_id = get_owner_id()
+    if employee_id != owner_id:
+        return jsonify({"error": "レポートを承認する権限がありません。"}), 403
+
+    db = get_db()
+    try:
+        today_str = datetime.now().strftime('%Y-%m-%d')
+
+        cursor = db.execute(
+            "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
+            (employee_id, year, month)
+        )
+        report_row = cursor.fetchone()
+
+        if report_row:
+            db.execute(
+                "UPDATE monthly_reports SET approval_date = ? WHERE report_id = ?",
+                (today_str, report_row['report_id'])
+            )
+        else:
+            db.execute(
+                "INSERT INTO monthly_reports (employee_id, year, month, approval_date) VALUES (?, ?, ?, ?)",
+                (employee_id, year, month, today_str)
+            )
+
+        db.commit()
+        app.logger.info(f"レポート承認成功: 社員ID={employee_id}, 年月={year}-{month}, 承認日={today_str}")
+        return jsonify({"message": "承認しました", "approval_date": today_str}), 200
+    except sqlite3.Error as e:
+        db.rollback()
+        app.logger.error(f"レポート承認エラー (DB): {e}")
+        return jsonify({"error": "データベースエラー"}), 500
 
 # -----------------------------------------------------------------------------
 # APIエンドポイント: 勤怠管理表関連
