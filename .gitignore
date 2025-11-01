@@ -24,3 +24,5 @@ temp_verify/
 *.db
 
 back_end/num.id
+back_end/sqlite3
+
