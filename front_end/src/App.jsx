@@ -217,6 +217,31 @@ function App() {
   };
 
   /**
+   * 月次レポートの承認を取り消します。
+   * @async
+   */
+  const handleCancelApproval = async () => {
+    if (window.confirm('承認を取り消しますか？')) {
+      try {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth() + 1;
+        const payload = {
+          employee_id: selectedEmployeeId,
+          year,
+          month,
+        };
+        const response = await axios.post(`${API_URL}/monthly_reports/cancel_approval`, payload);
+        setApprovalDate(response.data.approval_date);
+        setMessage(response.data.message);
+        setTimeout(() => setMessage(''), 3000);
+      } catch (error) {
+        console.error("承認の取り消しに失敗しました:", error);
+        setMessage(error.response?.data?.error || "承認の取り消しに失敗しました。");
+      }
+    }
+  };
+
+  /**
    * 作業記録と特記事項をサーバーに保存します。
    * @async
    */
@@ -368,6 +393,7 @@ function App() {
         onSave={handleSave}
         onPrint={handlePrint}
         onApprove={handleApprove}
+        onCancelApproval={handleCancelApproval}
         onOpenDailyReportList={() => setDailyReportListModalOpen(true)}
         onOpenMaster={handleOpenMaster}
         onRowClick={(record) => {
