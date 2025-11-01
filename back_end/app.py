@@ -453,6 +453,57 @@ def approve_monthly_report():
         app.logger.error(f"レポート承認エラー (DB): {e}")
         return jsonify({"error": "データベースエラー"}), 500
 
+@app.route('/api/monthly_reports/cancel_approval', methods=['POST'])
+def cancel_approval():
+    """月次レポートの承認を取り消し、承認日をNULLに設定します。
+
+    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
+
+    Request Body (JSON):
+        {
+            "employee_id": int,
+            "year": int,
+            "month": int
+        }
+    """
+    data = request.json
+    employee_id = data.get('employee_id')
+    year = data.get('year')
+    month = data.get('month')
+
+    if not all([employee_id, year, month]):
+        return jsonify({"error": "無効なデータです"}), 400
+
+    owner_id = get_owner_id()
+    if employee_id != owner_id:
+        return jsonify({"error": "承認を取り消す権限がありません。"}), 403
+
+    db = get_db()
+    try:
+        cursor = db.execute(
+            "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
+            (employee_id, year, month)
+        )
+        report_row = cursor.fetchone()
+
+        if report_row:
+            db.execute(
+                "UPDATE monthly_reports SET approval_date = NULL WHERE report_id = ?",
+                (report_row['report_id'],)
+            )
+            db.commit()
+            app.logger.info(f"レポート承認取り消し成功: 社員ID={employee_id}, 年月={year}-{month}")
+            return jsonify({"message": "承認を取り消しました", "approval_date": None}), 200
+        else:
+            # レポート自体が存在しない場合
+            app.logger.warning(f"承認取り消し試行: レポートが存在しません。社員ID={employee_id}, 年月={year}-{month}")
+            return jsonify({"error": "対象のレポートが見つかりません"}), 404
+
+    except sqlite3.Error as e:
+        db.rollback()
+        app.logger.error(f"レポート承認取り消しエラー (DB): {e}")
+        return jsonify({"error": "データベースエラー"}), 500
+
 # -----------------------------------------------------------------------------
 # APIエンドポイント: 勤怠管理表関連
 # -----------------------------------------------------------------------------
