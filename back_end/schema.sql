@@ -22,7 +22,6 @@ CREATE TABLE employees (
     department_name TEXT,
     employee_type TEXT, -- '正社員', 'アルバイト'など
     retirement_flag INTEGER NOT NULL DEFAULT 0, -- 0:在職, 1:退職
-    master_flag INTEGER NOT NULL DEFAULT 0, -- 0:一般, 1:マスター
     password TEXT, -- マスターユーザーのパスワード
     FOREIGN KEY (company_id) REFERENCES companies (company_id)
 );
@@ -56,6 +55,7 @@ CREATE TABLE monthly_reports (
     year INTEGER NOT NULL,
     month INTEGER NOT NULL,
     special_notes TEXT,
+    approval_date TEXT, -- 承認日 (YYYY-MM-DD)
     UNIQUE(employee_id, year, month),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );

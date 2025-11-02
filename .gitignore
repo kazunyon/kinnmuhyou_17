@@ -4,6 +4,7 @@ __pycache__/
 back_end/venv/
 venv/
 */venv/
+front_end/dist
 
 # Logs
 *.log
@@ -21,3 +22,6 @@ front_end/node_modules/
 jules-scratch/
 temp_verify/
 *.db
+
+back_end/num.id
+back_end/*.exe

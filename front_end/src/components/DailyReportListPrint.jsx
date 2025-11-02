@@ -1,7 +1,29 @@
 import React from 'react';
 
+/**
+ * 日報一覧を印刷するためのレイアウトを提供するコンポーネント。
+ * `React.forwardRef` を使用して、親コンポーネントがこのコンポーネントのDOMノードに
+ * 直接アクセスできるようにします（`react-to-print`で必要）。
+ * @param {object} props - コンポー-ネントのプロパティ。
+ * @param {object[]} props.reports - 印刷する日報データの配列。
+ * @param {number} props.year - 対象の年。
+ * @param {number} props.month - 対象の月。
+ * @param {React.Ref} ref - `react-to-print`ライブラリが参照するDOM要素へのref。
+ * @returns {JSX.Element|null} レンダリングされた印刷用レイアウト。データがない場合はnull。
+ */
 const DailyReportListPrint = React.forwardRef((props, ref) => {
   const { reports, year, month } = props;
+
+  /**
+   * 曜日に基づいてテーブル行のCSSクラス名を返します。
+   * @param {object} report - 日報オブジェクト。
+   * @returns {string} Tailwind CSSのクラス名。
+   */
+  const getRowClassName = (report) => {
+    if (report.isHoliday || report.dayOfWeek === '日') return 'bg-red-100 align-top';
+    if (report.dayOfWeek === '土') return 'bg-blue-100 align-top';
+    return 'align-top';
+  };
 
   if (!reports || reports.length === 0) {
     return null;
@@ -25,7 +47,7 @@ const DailyReportListPrint = React.forwardRef((props, ref) => {
         </thead>
         <tbody>
           {reports.map((report) => (
-            <tr key={report.date} className="align-top">
+            <tr key={report.date} className={getRowClassName(report)}>
               <td className="p-2 border border-black text-center">{report.date}</td>
               <td className="p-2 border border-black text-center">{report.dayOfWeek}</td>
               <td className="p-2 border border-black text-center">{report.workTime}</td>

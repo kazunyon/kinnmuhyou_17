@@ -8,6 +8,7 @@ from flask_cors import CORS
 import sqlite3
 import uuid
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # 外部の勤怠計算モジュールをインポート
 from attendance_calculator import AttendanceCalculator
@@ -15,49 +16,32 @@ from attendance_calculator import AttendanceCalculator
 # -----------------------------------------------------------------------------
 # アプリケーション設定
 # -----------------------------------------------------------------------------
-# Flaskアプリケーションのインスタンスを作成
-# static_folder='../front_end/dist' は、本番環境でReactのビルド成果物 (静的ファイル) を
-# Flaskから直接配信するための設定。'../front_end/dist'ディレクトリを静的フォルダとして指定。
 app = Flask(__name__, static_folder='../front_end/dist')
-
-# CORS (Cross-Origin Resource Sharing) を有効にする
-# これにより、異なるオリジン (この場合はフロントエンドの開発サーバー) からのAPIリクエストを受け付けることができる
 CORS(app)
-
-# データベースファイルの絶対パスを構築
-# __file__ はこのスクリプトのパスを指し、os.path.dirnameでディレクトリ名を取得
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 
 # -----------------------------------------------------------------------------
 # ロギング設定
 # -----------------------------------------------------------------------------
 def setup_logging():
-    """アプリケーションのログ出力を設定します。
+    """アプリケーションのログ記録を設定します。
 
     'logs' ディレクトリが存在しない場合は作成し、ローテーションするログファイルをセットアップします。
     ログはファイルサイズが10KBを超えるとローテーションされ、最大5つのバックアップが保持されます。
-    ログのフォーマットには、タイムスタンプ、ログレベル、メッセージ、ファイルパス、行番号が含まれます。
     """
-    # ログファイルを保存する 'logs' ディレクトリがなければ作成
     if not os.path.exists('logs'):
         os.mkdir('logs')
     
-    # タイムスタンプ付きのログファイル名を生成
     log_file_name = f"logs/app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-    
-    # RotatingFileHandlerを設定。ファイルサイズが10KBを超えると新しいファイルを作成し、5世代までバックアップ。
-    # encoding='utf-8'で日本語のログメッセージが文字化けしないようにする。
     handler = RotatingFileHandler(log_file_name, maxBytes=10000, backupCount=5, encoding='utf-8')
     handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
     ))
     
-    # アプリケーションのロガーレベルをINFOに設定し、作成したハンドラを追加
     app.logger.setLevel(logging.INFO)
     app.logger.addHandler(handler)
     app.logger.info('アプリケーション起動ログ')
 
-# アプリケーション起動時にロギング設定を実行
 setup_logging()
 
 # -----------------------------------------------------------------------------
@@ -67,9 +51,7 @@ def get_db():
     """リクエストコンテキスト内でデータベース接続を確立し、提供します。
 
     Flaskの`g`オブジェクトを使用して、同じリクエスト内での接続を再利用します。
-    接続が存在しない場合にのみ新しい接続を作成します。
-    `sqlite3.Row`をrow_factoryとして設定することで、カラム名でアクセスできる
-    辞書のような結果セットを返します。
+    接続が存在しない場合にのみ新しい接続を作成し、カラム名でアクセスできるよう設定します。
 
     Returns:
         sqlite3.Connection: データベース接続オブジェクト。
@@ -91,11 +73,9 @@ def get_db():
 def close_db(exception):
     """アプリケーションコンテキストの終了時にデータベース接続をクローズします。
 
-    この関数はFlaskによってリクエストの最後に自動的に呼び出され、
-    データベース接続が安全に閉じられることを保証し、接続リークを防ぎます。
-
     Args:
-        exception (Exception, optional): リクエスト処理中に発生した例外。デフォルトはNone。
+        exception (Exception, optional): リクエスト処理中に発生した例外。
+            Flaskによって自動的に渡されます。
     """
     db = g.pop('db', None)
     if db is not None:
@@ -108,42 +88,40 @@ def close_db(exception):
 
 @app.route('/api/employees', methods=['GET'])
 def get_employees():
-    """マスター権限を持つ在籍中の全社員リストを取得します。
+    """在籍中の全社員リストを取得します。
 
-    このエンドポイントは、作業報告書の氏名選択プルダウンで使用されることを想定しています。
-    `master_flag`が1かつ`retirement_flag`が0の社員にフィルタリングされます。
-    セキュリティのため、レスポンスからパスワードフィールドは除外されます。
+    作業報告書の氏名選択プルダウンで使用します。`retirement_flag`が0の社員に
+    限定し、パスワードフィールドは除外します。
 
     Returns:
-        Response: 社員オブジェクトのリストを含むJSONレスポンス。
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は社員オブジェクトのリストを含むJSONレスポンス。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
-        cursor = db.execute('SELECT * FROM employees WHERE master_flag = 1 AND retirement_flag = 0 ORDER BY employee_id')
+        cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         for emp in employees:
             emp.pop('password', None)
-        app.logger.info(f"{len(employees)}件のマスター権限を持つ社員データを取得しました。")
+        app.logger.info(f"{len(employees)}件の社員データを取得しました。")
         return jsonify(employees)
     except Exception as e:
-        app.logger.error(f"マスター社員データ取得エラー: {e}")
+        app.logger.error(f"社員データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/employees/all', methods=['GET'])
 def get_all_employees():
     """全社員のリストを取得します（マスターメンテナンス用）。
 
-    このエンドポイントは、マスターメンテナンス画面で全社員のリストを表示するために使用されます。
-    セキュリティ上の理由から、パスワード情報はレスポンスに含まれません。
+    マスターメンテナンス画面での表示に使用します。パスワード情報はレスポンスに含みません。
 
     Returns:
-        Response: 社員オブジェクトのリストを含むJSONレスポンス。
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は社員オブジェクトのリストを含むJSONレスポンス。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
-        cursor = db.execute('SELECT employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, master_flag FROM employees ORDER BY employee_id')
+        cursor = db.execute('SELECT employee_id, company_id, employee_name, department_name, employee_type, retirement_flag FROM employees ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
         app.logger.info(f"全社員データ（マスター用）を{len(employees)}件取得しました。")
         return jsonify(employees)
@@ -155,20 +133,14 @@ def get_all_employees():
 def authenticate_master():
     """マスターメンテナンス画面でのユーザー認証を行います。
 
-    提供された社員IDとパスワードを検証します。
-    認証が成功した場合、ユーザーがマスター権限を持っているか、
-    およびオーナーであるかどうかのフラグを返します。
+    提供された社員IDとパスワードを検証し、オーナーかどうかのフラグを返します。
 
-    Request Body (JSON):
-        {
-            "employee_id": int,
-            "password": str
-        }
+    Args:
+        request.json (dict): 'employee_id'と'password'を含むJSONオブジェクト。
 
     Returns:
-        Response: 認証結果を含むJSONレスポンス。
-                  成功時には { "success": True, "is_master": bool, "is_owner": bool } を返します。
-                  失敗時には適切なエラーメッセージとステータスコードを返します。
+        flask.Response: 認証成功時は{"success": True, "is_owner": bool}、
+                        失敗時はエラーメッセージと適切なステータスコードを返します。
     """
     data = request.json
     employee_id = data.get('employee_id')
@@ -179,35 +151,19 @@ def authenticate_master():
 
     try:
         db = get_db()
-        cursor = db.execute(
-            'SELECT password, master_flag FROM employees WHERE employee_id = ?',
-            (employee_id,)
-        )
+        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (employee_id,))
         user = cursor.fetchone()
 
-        if user and user['password'] == password:
-            is_master = user['master_flag'] == 1
+        if user and user['password'] and check_password_hash(user['password'], password):
             owner_id = get_owner_id()
-            is_owner = is_master and (int(employee_id) == owner_id)
-
-            if not is_master:
-                app.logger.warning(f"認証試行（マスター権限なし）: 社員ID={employee_id}")
-                return jsonify({"success": True, "is_master": False, "is_owner": False, "message": "マスター権限がありません"}), 200
-
-            app.logger.info(f"マスター認証成功: 社員ID={employee_id}, オーナー={is_owner}")
-
-            return jsonify({
-                "success": True,
-                "message": "認証に成功しました",
-                "is_master": True,
-                "is_owner": is_owner
-            }), 200
+            is_owner = int(employee_id) == owner_id
+            app.logger.info(f"認証成功: 社員ID={employee_id}, オーナー={is_owner}")
+            return jsonify({"success": True, "message": "認証に成功しました", "is_owner": is_owner}), 200
         else:
-            app.logger.warning(f"マスター認証失敗: 社員ID={employee_id}")
+            app.logger.warning(f"認証失敗: 社員ID={employee_id}")
             return jsonify({"success": False, "message": "認証情報が正しくありません"}), 401
-
     except Exception as e:
-        app.logger.error(f"マスター認証エラー: {e}")
+        app.logger.error(f"認証エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/companies', methods=['GET'])
@@ -215,9 +171,8 @@ def get_companies():
     """会社マスターの全データを取得します。
 
     Returns:
-        Response: 会社オブジェクトのリストを含むJSONレスポンス。
-                  例: [{"company_id": 1, "company_name": "株式会社ABC"}, ...]
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 会社オブジェクトのリストを含むJSONレスポンス。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
@@ -231,15 +186,14 @@ def get_companies():
 
 @app.route('/api/holidays/<int:year>', methods=['GET'])
 def get_holidays(year):
-    """指定された年の祝日リストをデータベースから取得します。
+    """指定された年の祝日リストを取得します。
 
     Args:
         year (int): 祝日を取得する対象の年。
 
     Returns:
-        Response: 日付をキー、祝日名を値とする辞書形式のJSONレスポンス。
-                  例: {"2025-01-01": "元日", "2025-10-13": "スポーツの日"}
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は日付をキー、祝日名を値とする辞書形式のJSON。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
@@ -257,9 +211,9 @@ def get_holidays(year):
 
 @app.route('/api/work_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_work_records(employee_id, year, month):
-    """指定された社員と年月の作業記録および月次特記事項を取得します。
+    """指定社員・年月の作業記録と月次特記事項を取得します。
 
-    作業報告書画面の初期表示に使用されます。日次記録と月次の特記事項の両方を返します。
+    作業報告書画面の初期表示に使用されます。
 
     Args:
         employee_id (int): 社員ID。
@@ -267,12 +221,8 @@ def get_work_records(employee_id, year, month):
         month (int): 対象月。
 
     Returns:
-        Response: 日次記録のリストと特記事項を含むJSONレスポンス。
-                  例: {
-                        "records": [{"day": 1, "start_time": "09:00", ...}, ...],
-                        "special_notes": "月次報告です。"
-                      }
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は日次記録と特記事項を含むJSON。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
@@ -287,14 +237,16 @@ def get_work_records(employee_id, year, month):
         records = [dict(row) for row in records_cursor.fetchall()]
 
         notes_cursor = db.execute("""
-            SELECT special_notes FROM monthly_reports
+            SELECT special_notes, approval_date FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
         """, (employee_id, year, month))
-        notes_row = notes_cursor.fetchone()
-        special_notes = notes_row['special_notes'] if notes_row else ""
+        report_row = notes_cursor.fetchone()
+
+        special_notes = report_row['special_notes'] if report_row else ""
+        approval_date = report_row['approval_date'] if report_row else None
 
         app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records)}件")
-        return jsonify({"records": records, "special_notes": special_notes})
+        return jsonify({"records": records, "special_notes": special_notes, "approval_date": approval_date})
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
@@ -303,23 +255,15 @@ def get_work_records(employee_id, year, month):
 def save_work_records():
     """作業報告書の日次記録と月次特記事項を保存（UPSERT）します。
 
-    データが存在しない場合は新規作成（INSERT）、存在する場合は更新（UPDATE）します。
-    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
+    オーナーIDと一致する社員のデータのみ保存可能です。
 
-    Request Body (JSON):
-        {
-            "employee_id": int,
-            "year": int,
-            "month": int,
-            "records": [{"day": int, "start_time": str, ...}, ...],
-            "special_notes": str
-        }
+    Args:
+        request.json (dict): 'employee_id', 'year', 'month', 'records',
+                             'special_notes' を含むJSONオブジェクト。
 
     Returns:
-        Response: 保存成功メッセージを含むJSONレスポンス。
-                  権限がない場合はステータスコード403、
-                  データが無効な場合は400、
-                  サーバーエラーの場合は500を返します。
+        flask.Response: 成功時はメッセージ、失敗時はエラーメッセージと
+                        適切なステータスコードを返します。
     """
     data = request.json
     employee_id = data.get('employee_id')
@@ -329,73 +273,115 @@ def save_work_records():
     special_notes = data.get('special_notes')
 
     if not all([employee_id, year, month, isinstance(records, list)]):
-        app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
-    owner_id = get_owner_id()
-    if employee_id != owner_id:
-        app.logger.warning(f"権限のない作業記録保存試行: 操作対象ID={employee_id}, オーナーID={owner_id}")
+    if employee_id != get_owner_id():
         return jsonify({"error": "作業記録を更新する権限がありません。"}), 403
 
     db = get_db()
     try:
-        cursor = db.execute(
-            "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
-            (employee_id, year, month)
-        )
+        cursor = db.execute("SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?", (employee_id, year, month))
         report_row = cursor.fetchone()
         if report_row:
-            db.execute(
-                "UPDATE monthly_reports SET special_notes = ? WHERE report_id = ?",
-                (special_notes, report_row['report_id'])
-            )
+            db.execute("UPDATE monthly_reports SET special_notes = ? WHERE report_id = ?", (special_notes, report_row['report_id']))
         else:
-            db.execute(
-                "INSERT INTO monthly_reports (employee_id, year, month, special_notes) VALUES (?, ?, ?, ?)",
-                (employee_id, year, month, special_notes)
-            )
+            db.execute("INSERT INTO monthly_reports (employee_id, year, month, special_notes) VALUES (?, ?, ?, ?)", (employee_id, year, month, special_notes))
 
         for record in records:
             day = record.get('day')
             if day is None: continue
-
             date_str = f"{year}-{month:02d}-{day:02d}"
             
-            cursor = db.execute(
-                "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
-                (employee_id, date_str)
-            )
+            cursor = db.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date_str))
             record_row = cursor.fetchone()
-
             if record_row:
-                db.execute("""
-                    UPDATE work_records
-                    SET start_time = ?, end_time = ?, break_time = ?, work_content = ?
-                    WHERE record_id = ?
-                """, (
-                    record.get('start_time'), record.get('end_time'),
-                    record.get('break_time'), record.get('work_content'),
-                    record_row['record_id']
-                ))
+                db.execute("UPDATE work_records SET start_time = ?, end_time = ?, break_time = ?, work_content = ? WHERE record_id = ?",
+                           (record.get('start_time'), record.get('end_time'), record.get('break_time'), record.get('work_content'), record_row['record_id']))
             else:
-                db.execute("""
-                    INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    employee_id, date_str, record.get('start_time'), record.get('end_time'),
-                    record.get('break_time'), record.get('work_content')
-                ))
-
+                db.execute("INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content) VALUES (?, ?, ?, ?, ?, ?)",
+                           (employee_id, date_str, record.get('start_time'), record.get('end_time'), record.get('break_time'), record.get('work_content')))
         db.commit()
-        app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
         return jsonify({"message": "保存しました"}), 200
-    except sqlite3.Error as e:
-        db.rollback()
-        app.logger.error(f"作業記録保存エラー (DB): {e}")
-        return jsonify({"error": "データベースエラー"}), 500
     except Exception as e:
         db.rollback()
         app.logger.error(f"作業記録保存エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/monthly_reports/approve', methods=['POST'])
+def approve_monthly_report():
+    """月次レポートを承認し、承認日を記録します。
+
+    オーナーIDと一致する社員のレポートのみ承認可能です。
+
+    Args:
+        request.json (dict): 'employee_id', 'year', 'month' を含むJSONオブジェクト。
+
+    Returns:
+        flask.Response: 成功時はメッセージと承認日、失敗時はエラーメッセージと
+                        適切なステータスコードを返します。
+    """
+    data = request.json
+    employee_id = data.get('employee_id')
+    year = data.get('year')
+    month = data.get('month')
+
+    if not all([employee_id, year, month]):
+        return jsonify({"error": "無効なデータです"}), 400
+    if employee_id != get_owner_id():
+        return jsonify({"error": "レポートを承認する権限がありません。"}), 403
+
+    db = get_db()
+    try:
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        cursor = db.execute("SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?", (employee_id, year, month))
+        report_row = cursor.fetchone()
+        if report_row:
+            db.execute("UPDATE monthly_reports SET approval_date = ? WHERE report_id = ?", (today_str, report_row['report_id']))
+        else:
+            db.execute("INSERT INTO monthly_reports (employee_id, year, month, approval_date) VALUES (?, ?, ?, ?)", (employee_id, year, month, today_str))
+        db.commit()
+        return jsonify({"message": "承認しました", "approval_date": today_str}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"レポート承認エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/monthly_reports/cancel_approval', methods=['POST'])
+def cancel_approval():
+    """月次レポートの承認を取り消します。
+
+    オーナーIDと一致する社員のレポートのみ取り消し可能です。
+
+    Args:
+        request.json (dict): 'employee_id', 'year', 'month' を含むJSONオブジェクト。
+
+    Returns:
+        flask.Response: 成功時はメッセージ、失敗時はエラーメッセージと
+                        適切なステータスコードを返します。
+    """
+    data = request.json
+    employee_id = data.get('employee_id')
+    year = data.get('year')
+    month = data.get('month')
+
+    if not all([employee_id, year, month]):
+        return jsonify({"error": "無効なデータです"}), 400
+    if employee_id != get_owner_id():
+        return jsonify({"error": "承認を取り消す権限がありません。"}), 403
+
+    db = get_db()
+    try:
+        cursor = db.execute("SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?", (employee_id, year, month))
+        report_row = cursor.fetchone()
+        if report_row:
+            db.execute("UPDATE monthly_reports SET approval_date = NULL WHERE report_id = ?", (report_row['report_id'],))
+            db.commit()
+            return jsonify({"message": "承認を取り消しました", "approval_date": None}), 200
+        else:
+            return jsonify({"error": "対象のレポートが見つかりません"}), 404
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"レポート承認取り消しエラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 # -----------------------------------------------------------------------------
@@ -404,11 +390,9 @@ def save_work_records():
 
 @app.route('/api/attendance_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_attendance_records(employee_id, year, month):
-    """指定された社員と年月の勤怠データを、日次・月次集計と共に取得します。
+    """指定社員・年月の勤怠データを日次・月次集計と共に取得します。
 
-    勤怠管理表画面の表示に必要な全ての計算済みデータを返します。
-    DBから作業記録と祝日を取得し、`AttendanceCalculator`モジュールを
-    使用して各日の勤怠サマリーと月次サマリーを計算します。
+    `AttendanceCalculator`モジュールを使い、勤怠サマリーを計算します。
 
     Args:
         employee_id (int): 社員ID。
@@ -416,94 +400,56 @@ def get_attendance_records(employee_id, year, month):
         month (int): 対象月。
 
     Returns:
-        Response: 日次記録のリストと月次集計を含むJSONレスポンス。
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は日次記録と月次集計を含むJSON。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
         calculator = AttendanceCalculator()
-
-        cursor = db.execute("""
-            SELECT * FROM work_records
-            WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
-        """, (employee_id, f"{year:04d}", f"{month:02d}"))
+        cursor = db.execute("SELECT * FROM work_records WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?",
+                            (employee_id, f"{year:04d}", f"{month:02d}"))
         records_map = {int(row['date'].split('-')[2]): dict(row) for row in cursor.fetchall()}
-
         cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (f"{year:04d}",))
         holidays_set = {row['date'] for row in cursor.fetchall()}
 
         _, num_days = calendar.monthrange(year, month)
         all_daily_data = []
-
         for day in range(1, num_days + 1):
             date_str = f"{year:04d}-{month:02d}-{day:02d}"
             db_record = records_map.get(day, {})
-
             weekday = datetime(year, month, day).weekday()
-            is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6]
-
-            calc_input = {
-                'start_time': db_record.get('start_time'),
-                'end_time': db_record.get('end_time'),
-                'break_time': db_record.get('break_time'),
-                'night_break_time': db_record.get('night_break_time'),
-                'holiday_type': db_record.get('holiday_type'),
-                'is_holiday_from_calendar': is_holiday_from_calendar
-            }
+            is_holiday = date_str in holidays_set or weekday in [5, 6]
+            calc_input = {'start_time': db_record.get('start_time'), 'end_time': db_record.get('end_time'),
+                          'break_time': db_record.get('break_time'), 'night_break_time': db_record.get('night_break_time'),
+                          'holiday_type': db_record.get('holiday_type'), 'is_holiday_from_calendar': is_holiday}
             daily_summary = calculator.calculate_daily_summary(calc_input)
-
-            daily_data = {
-                "day": day,
-                "date": date_str,
-                "weekday": weekday,
-                "holiday_type": db_record.get('holiday_type'),
-                "attendance_type": db_record.get('attendance_type'),
-                "start_time": db_record.get('start_time'),
-                "end_time": db_record.get('end_time'),
-                "break_time": db_record.get('break_time'),
-                "night_break_time": db_record.get('night_break_time'),
-                "remarks": db_record.get('work_content'),
-                "daily_summary": daily_summary
-            }
+            daily_data = {"day": day, "date": date_str, "weekday": weekday, **db_record, "daily_summary": daily_summary}
             all_daily_data.append(daily_data)
 
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data)
-
-        app.logger.info(f"勤怠データ取得成功: 社員ID={employee_id}, 年月={year}-{month}")
-        return jsonify({
-            "daily_records": all_daily_data,
-            "monthly_summary": monthly_summary
-        })
-
+        return jsonify({"daily_records": all_daily_data, "monthly_summary": monthly_summary})
     except Exception as e:
         app.logger.error(f"勤怠データ取得エラー: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/attendance_records', methods=['POST'])
 def save_attendance_records():
     """勤怠管理表からの日次勤怠データを保存（UPSERT）します。
 
-    作業報告書よりも詳細な勤怠情報（勤怠種別、深夜休憩など）を扱います。
-    データが存在しない場合は新規作成、存在する場合は更新します。
+    詳細な勤怠情報（勤怠種別、深夜休憩など）を扱います。
 
-    Request Body (JSON):
-        {
-            "employee_id": int,
-            "records": [{"date": str, "start_time": str, "holiday_type": int, ...}, ...]
-        }
+    Args:
+        request.json (dict): 'employee_id'と'records'を含むJSONオブジェクト。
 
     Returns:
-        Response: 保存成功メッセージを含むJSONレスポンス。
-                  データが無効な場合は400、サーバーエラーの場合は500を返します。
+        flask.Response: 成功時はメッセージ、失敗時はエラーメッセージと
+                        適切なステータスコードを返します。
     """
     data = request.json
     employee_id = data.get('employee_id')
     records = data.get('records')
 
     if not all([employee_id, isinstance(records, list)]):
-        app.logger.warning("勤怠データ保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
     db = get_db()
@@ -511,52 +457,28 @@ def save_attendance_records():
         for record in records:
             date_str = record.get('date')
             if not date_str: continue
-
-            cursor = db.execute(
-                "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
-                (employee_id, date_str)
-            )
+            cursor = db.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date_str))
             record_row = cursor.fetchone()
 
+            att_type = record.get('attendance_type')
+            is_full_day_off = att_type in [2, 3, 6, 7]
             params = {
-                'employee_id': employee_id,
-                'date': date_str,
+                'start_time': "00:00" if is_full_day_off else record.get('start_time'),
+                'end_time': "00:00" if is_full_day_off else record.get('end_time'),
+                'break_time': "00:00" if is_full_day_off else record.get('break_time'),
+                'night_break_time': "00:00" if is_full_day_off else record.get('night_break_time'),
                 'holiday_type': record.get('holiday_type'),
-                'attendance_type': record.get('attendance_type'),
-                'start_time': record.get('start_time'),
-                'end_time': record.get('end_time'),
-                'break_time': record.get('break_time'),
-                'night_break_time': record.get('night_break_time'),
+                'attendance_type': att_type,
                 'work_content': record.get('remarks')
             }
-
             if record_row:
-                params['record_id'] = record_row['record_id']
-                db.execute("""
-                    UPDATE work_records SET
-                    holiday_type=:holiday_type, attendance_type=:attendance_type, start_time=:start_time,
-                    end_time=:end_time, break_time=:break_time, night_break_time=:night_break_time,
-                    work_content=:work_content
-                    WHERE record_id=:record_id
-                """, params)
+                db.execute("UPDATE work_records SET holiday_type=:holiday_type, attendance_type=:attendance_type, start_time=:start_time, end_time=:end_time, break_time=:break_time, night_break_time=:night_break_time, work_content=:work_content WHERE record_id=?",
+                           (*params.values(), record_row['record_id']))
             else:
-                db.execute("""
-                    INSERT INTO work_records (
-                        employee_id, date, holiday_type, attendance_type, start_time,
-                        end_time, break_time, night_break_time, work_content
-                    ) VALUES (
-                        :employee_id, :date, :holiday_type, :attendance_type, :start_time,
-                        :end_time, :break_time, :night_break_time, :work_content
-                    )
-                """, params)
-
+                db.execute("INSERT INTO work_records (employee_id, date, holiday_type, attendance_type, start_time, end_time, break_time, night_break_time, work_content) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                           (employee_id, date_str, *params.values()))
         db.commit()
-        app.logger.info(f"勤怠データ保存成功: 社員ID={employee_id}")
         return jsonify({"message": "保存しました"}), 200
-    except sqlite3.Error as e:
-        db.rollback()
-        app.logger.error(f"勤怠データ保存エラー (DB): {e}")
-        return jsonify({"error": "データベースエラー"}), 500
     except Exception as e:
         db.rollback()
         app.logger.error(f"勤怠データ保存エラー: {e}")
@@ -575,23 +497,14 @@ def get_daily_report(employee_id, date_str):
         date_str (str): 日付文字列 (YYYY-MM-DD)。
 
     Returns:
-        Response: 日報データオブジェクトを含むJSONレスポンス。
-                  データが存在しない場合は`null`を返します。
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+        flask.Response: 成功時は日報データ、存在しない場合はnull。
+                        失敗時はエラーステータスコード500を返します。
     """
     try:
         db = get_db()
-        cursor = db.execute(
-            'SELECT * FROM daily_reports WHERE employee_id = ? AND date = ?',
-            (employee_id, date_str)
-        )
+        cursor = db.execute('SELECT * FROM daily_reports WHERE employee_id = ? AND date = ?', (employee_id, date_str))
         report = cursor.fetchone()
-        if report:
-            app.logger.info(f"日報データ取得成功: 社員ID={employee_id}, 日付={date_str}")
-            return jsonify(dict(report))
-        else:
-            app.logger.info(f"日報データなし: 社員ID={employee_id}, 日付={date_str}")
-            return jsonify(None)
+        return jsonify(dict(report) if report else None)
     except Exception as e:
         app.logger.error(f"日報データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
@@ -600,58 +513,39 @@ def get_daily_report(employee_id, date_str):
 def save_daily_report():
     """日報データを保存（UPSERT）します。
 
-    データが存在しない場合は新規作成、存在する場合は更新します。
+    関連する作業記録の作業内容も同時に更新します。
 
-    Request Body (JSON):
-        {
-            "employee_id": int,
-            "date": str,
-            "work_summary": str,
-            "problems": str,
-            "challenges": str,
-            "tomorrow_tasks": str,
-            "thoughts": str
-        }
+    Args:
+        request.json (dict): 'employee_id', 'date'と日報内容を含むJSONオブジェクト。
 
     Returns:
-        Response: 保存成功メッセージを含むJSONレスポンス。
-                  データが無効な場合は400、サーバーエラーの場合は500を返します。
+        flask.Response: 成功時はメッセージ、失敗時はエラーメッセージと
+                        適切なステータスコードを返します。
     """
     data = request.json
-    employee_id = data.get('employee_id')
-    date = data.get('date')
-
-    if not all([employee_id, date]):
+    if not all([data.get('employee_id'), data.get('date')]):
         return jsonify({"error": "無効なデータです"}), 400
 
+    db = get_db()
     try:
-        db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT 1 FROM daily_reports WHERE employee_id = ? AND date = ?", (employee_id, date))
+        cursor.execute("SELECT 1 FROM daily_reports WHERE employee_id = ? AND date = ?", (data['employee_id'], data['date']))
         exists = cursor.fetchone()
-
         if exists:
-            cursor.execute("""
-                UPDATE daily_reports SET
-                work_summary = ?, problems = ?, challenges = ?, tomorrow_tasks = ?, thoughts = ?
-                WHERE employee_id = ? AND date = ?
-            """, (
-                data.get('work_summary'), data.get('problems'), data.get('challenges'),
-                data.get('tomorrow_tasks'), data.get('thoughts'),
-                employee_id, date
-            ))
+            cursor.execute("UPDATE daily_reports SET work_summary=?, problems=?, challenges=?, tomorrow_tasks=?, thoughts=? WHERE employee_id=? AND date=?",
+                           (data.get('work_summary'), data.get('problems'), data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts'), data['employee_id'], data['date']))
         else:
-            cursor.execute("""
-                INSERT INTO daily_reports 
-                (employee_id, date, work_summary, problems, challenges, tomorrow_tasks, thoughts)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                employee_id, date, data.get('work_summary'), data.get('problems'),
-                data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')
-            ))
+            cursor.execute("INSERT INTO daily_reports (employee_id, date, work_summary, problems, challenges, tomorrow_tasks, thoughts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                           (data['employee_id'], data['date'], data.get('work_summary'), data.get('problems'), data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')))
         
+        cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (data['employee_id'], data['date']))
+        work_record = cursor.fetchone()
+        if work_record:
+            cursor.execute("UPDATE work_records SET work_content = ? WHERE record_id = ?", (data.get('work_summary'), work_record['record_id']))
+        else:
+            cursor.execute("INSERT INTO work_records (employee_id, date, work_content) VALUES (?, ?, ?)", (data['employee_id'], data['date'], data.get('work_summary')))
+
         db.commit()
-        app.logger.info(f"日報データ保存成功: 社員ID={employee_id}, 日付={date}")
         return jsonify({"message": "日報を保存しました"}), 200
     except Exception as e:
         db.rollback()
@@ -672,11 +566,8 @@ def get_owner_id():
     try:
         num_id_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'num.id')
         with open(num_id_path, 'r') as f:
-            owner_id = int(f.read().strip())
-            app.logger.info(f"オーナーID ({owner_id}) を num.id から読み込みました。")
-            return owner_id
-    except (FileNotFoundError, ValueError) as e:
-        app.logger.error(f"num.idファイルの読み込みに失敗しました: {e}")
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
         return 1
 
 @app.route('/api/owner_info', methods=['GET'])
@@ -684,8 +575,7 @@ def get_owner_info():
     """オーナーのIDと氏名を取得します。
 
     Returns:
-        Response: オーナーのIDと氏名を含むJSONレスポンス。
-                  オーナーが見つからない場合は404エラーを返します。
+        flask.Response: 成功時はオーナーIDと氏名、失敗時はエラーを返します。
     """
     try:
         owner_id = get_owner_id()
@@ -700,6 +590,24 @@ def get_owner_info():
         app.logger.error(f"オーナー情報取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+def _get_employee_company_id(employee_id):
+    """指定された社員IDが所属する会社のIDを取得します。
+
+    Args:
+        employee_id (int): 対象の社員ID。
+
+    Returns:
+        int | None: 会社のID。見つからない場合はNone。
+    """
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT company_id FROM employees WHERE employee_id = ?', (employee_id,))
+        employee = cursor.fetchone()
+        return employee['company_id'] if employee else None
+    except Exception as e:
+        app.logger.error(f"社員の会社ID取得エラー: {e}")
+        return None
+
 def is_valid_owner(owner_id, password):
     """提供されたIDとパスワードが正規のオーナーのものであるかを検証します。
 
@@ -711,71 +619,45 @@ def is_valid_owner(owner_id, password):
         bool: IDとパスワードが正規のオーナーのものであればTrue、そうでなければFalse。
     """
     try:
-        true_owner_id = get_owner_id()
-        if int(owner_id) != true_owner_id:
-            app.logger.warning(f"オーナー認証失敗: IDの不一致 (要求: {owner_id}, 正: {true_owner_id})")
+        if int(owner_id) != get_owner_id():
             return False
-
         db = get_db()
-        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (true_owner_id,))
+        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (owner_id,))
         owner = cursor.fetchone()
-
-        if owner and owner['password'] == password:
-            app.logger.info("オーナー認証成功")
-            return True
-        else:
-            app.logger.warning("オーナー認証失敗: パスワードの不一致")
-            return False
-    except Exception as e:
-        app.logger.error(f"オーナー認証中に例外発生: {e}")
+        return bool(owner and owner['password'] and check_password_hash(owner['password'], password))
+    except Exception:
         return False
 
 @app.route('/api/employee', methods=['POST'])
 def add_employee():
     """新しい社員を追加します（マスターメンテナンス用）。
 
-    この操作は、リクエストに含まれる認証情報が正規のオーナーのものである
-    場合にのみ許可されます。
+    オーナーのみが、自身の会社に新しい社員を追加できます。
 
-    Request Body (JSON):
-        {
-            "owner_id": int,
-            "owner_password": str,
-            "company_id": int,
-            "employee_name": str,
-            "department_name": str,
-            "employee_type": str,
-            "retirement_flag": bool,
-            "master_flag": bool
-        }
+    Args:
+        request.json (dict): 'owner_id', 'owner_password', および
+                             新しい社員の情報を含むJSONオブジェクト。
 
     Returns:
-        Response: 追加成功メッセージと新しい社員IDを含むJSONレスポンス。
-                  権限がない場合は403、サーバーエラーの場合は500を返します。
+        flask.Response: 成功時はメッセージと新社員ID、失敗時はエラーを返します。
     """
     data = request.json
-
     if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
+
+    owner_company_id = _get_employee_company_id(data.get('owner_id'))
+    if not owner_company_id or owner_company_id != data.get('company_id'):
+        return jsonify({"error": "自分の会社以外の社員は追加できません"}), 403
 
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("""
-            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, master_flag)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            data.get('company_id', 1),
-            data.get('employee_name'),
-            data.get('department_name'),
-            data.get('employee_type'),
-            1 if data.get('retirement_flag') else 0,
-            1 if data.get('master_flag') else 0,
-        ))
+        password_hash = generate_password_hash('123')
+        cursor.execute("INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, password) VALUES (?, ?, ?, ?, ?, ?)",
+                       (data.get('company_id'), data.get('employee_name'), data.get('department_name'), data.get('employee_type'),
+                        1 if data.get('retirement_flag') else 0, password_hash))
         db.commit()
-        new_id = cursor.lastrowid
-        app.logger.info(f"新規社員追加成功: {data.get('employee_name')}, ID={new_id}")
-        return jsonify({"message": "社員を追加しました", "employee_id": new_id}), 201
+        return jsonify({"message": "社員を追加しました", "employee_id": cursor.lastrowid}), 201
     except Exception as e:
         db.rollback()
         app.logger.error(f"社員追加エラー: {e}")
@@ -785,54 +667,29 @@ def add_employee():
 def update_employee(employee_id):
     """既存の社員情報を更新します（マスターメンテナンス用）。
 
-    この操作は、正規のオーナーであり、かつオーナー自身の情報を
-    更新する場合にのみ許可されます。
+    オーナーのみが、自身の会社の社員情報を更新できます。
 
     Args:
         employee_id (int): 更新対象の社員ID。
-
-    Request Body (JSON):
-        {
-            "owner_id": int,
-            "owner_password": str,
-            "employee_name": str,
-            "department_name": str,
-            "employee_type": str,
-            "retirement_flag": bool,
-            "master_flag": bool
-        }
+        request.json (dict): 'owner_id', 'owner_password', および
+                             更新後の社員情報を含むJSONオブジェクト。
 
     Returns:
-        Response: 更新成功メッセージを含むJSONレスポンス。
-                  権限がない場合は403、サーバーエラーの場合は500を返します。
+        flask.Response: 成功時はメッセージ、失敗時はエラーを返します。
     """
     data = request.json
-    owner_id_from_request = data.get('owner_id')
-
-    if not is_valid_owner(owner_id_from_request, data.get('owner_password')):
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    if int(owner_id_from_request) != employee_id:
-        app.logger.warning(f"権限のない更新試行: 操作者={owner_id_from_request}, 対象社員={employee_id}")
-        return jsonify({"error": "自分以外の社員情報は更新できません"}), 403
+    owner_company_id = _get_employee_company_id(data.get('owner_id'))
+    if not owner_company_id or owner_company_id != _get_employee_company_id(employee_id):
+        return jsonify({"error": "自分の会社の社員情報のみ更新できます"}), 403
 
     try:
         db = get_db()
-        db.execute("""
-            UPDATE employees SET
-            employee_name = ?, department_name = ?, employee_type = ?,
-            retirement_flag = ?, master_flag = ?
-            WHERE employee_id = ?
-        """, (
-            data.get('employee_name'),
-            data.get('department_name'),
-            data.get('employee_type'),
-            1 if data.get('retirement_flag') else 0,
-            1 if data.get('master_flag') else 0,
-            employee_id
-        ))
-        app.logger.info(f"社員情報（パスワードを除く）を更新しました: ID={employee_id}")
-
+        db.execute("UPDATE employees SET employee_name=?, department_name=?, employee_type=?, retirement_flag=? WHERE employee_id=?",
+                   (data.get('employee_name'), data.get('department_name'), data.get('employee_type'),
+                    1 if data.get('retirement_flag') else 0, employee_id))
         db.commit()
         return jsonify({"message": "社員情報を更新しました"}), 200
     except Exception as e:
@@ -846,43 +703,24 @@ def update_employee(employee_id):
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
-    """本番環境でフロントエンドの静的ファイルまたはindex.htmlを配信します。
+    """本番環境でフロントエンドの静的ファイルを配信します。
 
-    リクエストされたパスが`static_folder`内に物理的なファイルとして存在する場合、
-    そのファイルを配信します。これは、CSS、JavaScriptバンドル、画像などのアセットに
-    対応します。
-
-    パスがファイルとして存在しない場合、Reactアプリケーションのエントリーポイントである
-    `index.html`を配信します。これにより、React Routerのようなクライアントサイドの
-    ルーティングが正しく機能します。
+    リクエストされたパスがファイルとして存在しない場合は、`index.html`を返し、
+    クライアントサイドのルーティングを有効にします。
 
     Args:
         path (str): リクエストされたパス。
 
     Returns:
-        Response: 静的ファイルまたはindex.htmlの内容。
+        flask.Response: 静的ファイルまたはindex.htmlの内容。
     """
-    app.logger.info(f"フロントエンド配信リクエスト受信: path='{path}'")
-    static_folder_path = app.static_folder
-
-    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-        app.logger.info(f"静的ファイル '{path}' を配信します。")
-        return send_from_directory(static_folder_path, path)
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
     else:
-        app.logger.info("Reactアプリの index.html を配信します。")
-        return send_from_directory(static_folder_path, 'index.html')
+        return send_from_directory(app.static_folder, 'index.html')
 
 # -----------------------------------------------------------------------------
 # スクリプト直接実行
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    # このスクリプトが直接実行された場合にFlaskの開発サーバーを起動します。
-    # `python back_end/app.py` で実行します。
-    #
-    # debug=True: デバッグモードを有効にし、コード変更時にサーバーを自動リロードします。
-    # use_reloader=False: デバッグモードでのリローダーの重複を防ぎます。
-    # port=5000: サーバーがリッスンするポートを指定します。
-    #
-    # 注意: この開発サーバーは本番環境での使用には適していません。
-    # 本番環境ではGunicornやWaitressのようなWSGIサーバーを使用してください。
     app.run(debug=True, use_reloader=False, port=5000)
