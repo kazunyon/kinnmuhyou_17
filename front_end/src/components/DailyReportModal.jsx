@@ -51,9 +51,9 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   useEffect(() => {
     if (isOpen && employeeId && date) {
       setTimes({
-          startTime: workRecord?.start_time ?? '09:00',
-          endTime: workRecord?.end_time ?? '18:00',
-          breakTime: workRecord?.break_time ?? '01:00'
+          startTime: workRecord?.start_time || '09:00',
+          endTime: workRecord?.end_time || '18:00',
+          breakTime: workRecord?.break_time || '01:00'
       });
       
       const fetchReport = async () => {
@@ -84,7 +84,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
    */
   const handleTimeChange = (field, part, value) => {
       const currentTime = times[field];
-      let [h, m] = currentTime.split(':');
+      let [h, m] = (currentTime || "00:00").split(':');
       if(part === 'h') h = value;
       if(part === 'm') m = value;
       setTimes(prev => ({...prev, [field]: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}));

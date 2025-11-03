@@ -782,6 +782,10 @@ def save_daily_report():
     data = request.json
     employee_id = data.get('employee_id')
     date = data.get('date')
+    
+    # ★★★ デバッグ用に追加 (ここから) ★★★
+#    app.logger.info(f"save_daily_report が受信したデータ: {data}")
+    # ★★★ デバッグ用に追加 (ここまで) ★★★
 
     if not all([employee_id, date]):
         return jsonify({"error": "無効なデータです"}), 400
