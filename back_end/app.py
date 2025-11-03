@@ -816,23 +816,26 @@ def save_daily_report():
                 data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')
             ))
         
-        # 2. work_records テーブルの work_content も一貫性のためにUPSERT
+        # 2. work_recordsテーブルも更新
+        # 日報の入力はwork_recordsのデータソースでもあるため、こちらにも反映させる
         work_summary = data.get('work_summary')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
         break_time = data.get('break_time')
 
         cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
-        work_record = cursor.fetchone()
+        record_row = cursor.fetchone()
 
-        if work_record:
+        if record_row:
             # 存在すればUPDATE
+            # 日報で入力された勤務時間も更新する
             cursor.execute(
                 "UPDATE work_records SET work_content = ?, start_time = ?, end_time = ?, break_time = ? WHERE record_id = ?",
-                (work_summary, start_time, end_time, break_time, work_record['record_id'])
+                (work_summary, start_time, end_time, break_time, record_row['record_id'])
             )
         else:
-            # work_recordsに該当日のレコードがない場合、日報の作業内容で新規作成
+            # 存在しなければINSERT
+            # 日報で初めてその日のデータが入力される場合、work_recordsにもレコードを作成する
             cursor.execute(
                 "INSERT INTO work_records (employee_id, date, work_content, start_time, end_time, break_time) VALUES (?, ?, ?, ?, ?, ?)",
                 (employee_id, date, work_summary, start_time, end_time, break_time)
