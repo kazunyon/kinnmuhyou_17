@@ -111,7 +111,10 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       await axios.post(`${API_URL}/daily_report`, {
         employee_id: employeeId,
         date: date,
-        ...reportData
+        ...reportData,
+        start_time: times.startTime,
+        end_time: times.endTime,
+        break_time: times.breakTime,
       });
 
       onSave({
