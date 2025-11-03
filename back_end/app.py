@@ -818,20 +818,27 @@ def save_daily_report():
         
         # 2. work_records テーブルの work_content も一貫性のためにUPSERT
         work_summary = data.get('work_summary')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        break_time = data.get('break_time')
+
         cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
         work_record = cursor.fetchone()
 
         if work_record:
             # 存在すればUPDATE
             cursor.execute(
-                "UPDATE work_records SET work_content = ? WHERE record_id = ?",
-                (work_summary, work_record['record_id'])
+                """UPDATE work_records
+                   SET work_content = ?, start_time = ?, end_time = ?, break_time = ?
+                   WHERE record_id = ?""",
+                (work_summary, start_time, end_time, break_time, work_record['record_id'])
             )
         else:
             # work_recordsに該当日のレコードがない場合、日報の作業内容で新規作成
             cursor.execute(
-                "INSERT INTO work_records (employee_id, date, work_content) VALUES (?, ?, ?)",
-                (employee_id, date, work_summary)
+                """INSERT INTO work_records (employee_id, date, work_content, start_time, end_time, break_time)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (employee_id, date, work_summary, start_time, end_time, break_time)
             )
 
         db.commit()
