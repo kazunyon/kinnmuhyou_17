@@ -67,8 +67,9 @@ setup_logging()
 def get_db():
     """リクエストコンテキスト内でデータベース接続を確立し、提供します。
 
-    Flaskの`g`オブジェクトを使用して、同じリクエスト内での接続を再利用します。
-    接続が存在しない場合にのみ新しい接続を作成します。
+    Flaskの`g`オブジェクトは、リクエストごとにユニークなグローバル名前空間として機能します。
+    これを利用して、同じリクエスト内でデータベース接続を一度だけ作成し、再利用します。
+    接続が存在しない場合にのみ新しい接続を確立することで、効率的なリソース管理を実現します。
     `sqlite3.Row`をrow_factoryとして設定することで、カラム名でアクセスできる
     辞書のような結果セットを返します。
 
@@ -123,6 +124,7 @@ def get_employees():
         db = get_db()
         cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
         employees = [dict(row) for row in cursor.fetchall()]
+        # パスワードハッシュがフロントエンドに渡らないように、レスポンスから削除する
         for emp in employees:
             emp.pop('password', None)
         app.logger.info(f"{len(employees)}件の社員データを取得しました。")
@@ -157,7 +159,7 @@ def authenticate_master():
     """マスターメンテナンス画面でのユーザー認証を行います。
 
     提供された社員IDとパスワードを検証します。
-    認証が成功した場合、ユーザーがオーナーであるかどうかのフラグを返します。
+    認証が成功した場合、ユーザーがシステムのオーナーであるかどうかのフラグも返します。
 
     Request Body (JSON):
         {
@@ -185,7 +187,9 @@ def authenticate_master():
         )
         user = cursor.fetchone()
 
+        # パスワードがハッシュ化されているため、check_password_hashで比較する
         if user and user['password'] and check_password_hash(user['password'], password):
+            # 認証成功後、オーナーIDと一致するかを確認
             owner_id = get_owner_id()
             is_owner = int(employee_id) == owner_id
 
@@ -273,6 +277,7 @@ def get_work_records(employee_id, year, month):
         year_str = str(year)
         month_str = f"{month:02d}"
 
+        # 該当月の作業記録を取得
         records_cursor = db.execute("""
             SELECT CAST(strftime('%d', date) AS INTEGER) as day, start_time, end_time, break_time, work_content
             FROM work_records
@@ -280,12 +285,14 @@ def get_work_records(employee_id, year, month):
         """, (employee_id, year_str, month_str))
         records = [dict(row) for row in records_cursor.fetchall()]
 
+        # 該当月の月次レポート（特記事項や承認日）を取得
         notes_cursor = db.execute("""
             SELECT special_notes, approval_date FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
         """, (employee_id, year, month))
         report_row = notes_cursor.fetchone()
 
+        # レポートが存在すればその値を、なければデフォルト値を設定
         special_notes = report_row['special_notes'] if report_row else ""
         approval_date = report_row['approval_date'] if report_row else None
 
@@ -301,10 +308,11 @@ def get_work_records(employee_id, year, month):
 
 @app.route('/api/work_records', methods=['POST'])
 def save_work_records():
-    """作業報告書の日次記録と月次特記事項を保存（UPSERT）します。
+    """作業報告書の日次記録と月次特記事項を保存します（UPSERT処理）。
 
-    データが存在しない場合は新規作成（INSERT）、存在する場合は更新（UPDATE）します。
-    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
+    UPSERT処理: データが存在しない場合は新規作成（INSERT）、存在する場合は更新（UPDATE）します。
+    この操作は、リクエスト元の`employee_id`がシステムのオーナーIDと一致する場合にのみ許可されます。
+    これにより、オーナーのみが他者の作業報告書を編集できるというセキュリティを担保します。
 
     Request Body (JSON):
         {
@@ -332,6 +340,7 @@ def save_work_records():
         app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
+    # セキュリティチェック: オーナー以外のユーザーからの更新を防ぐ
     owner_id = get_owner_id()
     if employee_id != owner_id:
         app.logger.warning(f"権限のない作業記録保存試行: 操作対象ID={employee_id}, オーナーID={owner_id}")
@@ -339,25 +348,29 @@ def save_work_records():
 
     db = get_db()
     try:
+        # 1. 月次レポートの特記事項をUPSERT
         cursor = db.execute(
             "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
             (employee_id, year, month)
         )
         report_row = cursor.fetchone()
         if report_row:
+            # 存在すればUPDATE
             db.execute(
                 "UPDATE monthly_reports SET special_notes = ? WHERE report_id = ?",
                 (special_notes, report_row['report_id'])
             )
         else:
+            # 存在しなければINSERT
             db.execute(
                 "INSERT INTO monthly_reports (employee_id, year, month, special_notes) VALUES (?, ?, ?, ?)",
                 (employee_id, year, month, special_notes)
             )
 
+        # 2. 日次作業記録をループでUPSERT
         for record in records:
             day = record.get('day')
-            if day is None: continue
+            if day is None: continue # 日付がないデータはスキップ
 
             date_str = f"{year}-{month:02d}-{day:02d}"
             
@@ -368,6 +381,7 @@ def save_work_records():
             record_row = cursor.fetchone()
 
             if record_row:
+                # 存在すればUPDATE
                 db.execute("""
                     UPDATE work_records
                     SET start_time = ?, end_time = ?, break_time = ?, work_content = ?
@@ -378,6 +392,7 @@ def save_work_records():
                     record_row['record_id']
                 ))
             else:
+                # 存在しなければINSERT
                 db.execute("""
                     INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content)
                     VALUES (?, ?, ?, ?, ?, ?)
@@ -386,15 +401,15 @@ def save_work_records():
                     record.get('break_time'), record.get('work_content')
                 ))
 
-        db.commit()
+        db.commit() # 全ての処理が成功したらコミット
         app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
         return jsonify({"message": "保存しました"}), 200
     except sqlite3.Error as e:
-        db.rollback()
+        db.rollback() # エラーが発生したらロールバック
         app.logger.error(f"作業記録保存エラー (DB): {e}")
         return jsonify({"error": "データベースエラー"}), 500
     except Exception as e:
-        db.rollback()
+        db.rollback() # エラーが発生したらロールバック
         app.logger.error(f"作業記録保存エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
@@ -402,8 +417,9 @@ def save_work_records():
 def approve_monthly_report():
     """月次レポートを承認し、承認日を記録します。
 
-    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
-    もし対象の年月に月次レポートが存在しない場合は、このタイミングで新規作成します。
+    この操作は、リクエスト元の`employee_id`がシステムのオーナーIDと一致する場合にのみ許可されます。
+    もし対象の年月に月次レポート（`monthly_reports`テーブルのレコード）が存在しない場合は、
+    この承認のタイミングで新規作成します。
 
     Request Body (JSON):
         {
@@ -420,6 +436,7 @@ def approve_monthly_report():
     if not all([employee_id, year, month]):
         return jsonify({"error": "無効なデータです"}), 400
 
+    # セキュリティチェック: オーナーのみが承認可能
     owner_id = get_owner_id()
     if employee_id != owner_id:
         return jsonify({"error": "レポートを承認する権限がありません。"}), 403
@@ -428,6 +445,7 @@ def approve_monthly_report():
     try:
         today_str = datetime.now().strftime('%Y-%m-%d')
 
+        # UPSERT処理: monthly_reportsにレコードがあるか確認
         cursor = db.execute(
             "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
             (employee_id, year, month)
@@ -435,11 +453,13 @@ def approve_monthly_report():
         report_row = cursor.fetchone()
 
         if report_row:
+            # 存在すればUPDATEで承認日を設定
             db.execute(
                 "UPDATE monthly_reports SET approval_date = ? WHERE report_id = ?",
                 (today_str, report_row['report_id'])
             )
         else:
+            # 存在しなければINSERTで承認日と共に新規作成
             db.execute(
                 "INSERT INTO monthly_reports (employee_id, year, month, approval_date) VALUES (?, ?, ?, ?)",
                 (employee_id, year, month, today_str)
@@ -457,7 +477,7 @@ def approve_monthly_report():
 def cancel_approval():
     """月次レポートの承認を取り消し、承認日をNULLに設定します。
 
-    この操作は、リクエスト元の`employee_id`がオーナーIDと一致する場合にのみ許可されます。
+    この操作は、リクエスト元の`employee_id`がシステムのオーナーIDと一致する場合にのみ許可されます。
 
     Request Body (JSON):
         {
@@ -474,12 +494,14 @@ def cancel_approval():
     if not all([employee_id, year, month]):
         return jsonify({"error": "無効なデータです"}), 400
 
+    # セキュリティチェック: オーナーのみが承認取り消し可能
     owner_id = get_owner_id()
     if employee_id != owner_id:
         return jsonify({"error": "承認を取り消す権限がありません。"}), 403
 
     db = get_db()
     try:
+        # レポートが存在するか確認
         cursor = db.execute(
             "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
             (employee_id, year, month)
@@ -487,6 +509,7 @@ def cancel_approval():
         report_row = cursor.fetchone()
 
         if report_row:
+            # レポートが存在すれば承認日をNULLに更新
             db.execute(
                 "UPDATE monthly_reports SET approval_date = NULL WHERE report_id = ?",
                 (report_row['report_id'],)
@@ -495,7 +518,7 @@ def cancel_approval():
             app.logger.info(f"レポート承認取り消し成功: 社員ID={employee_id}, 年月={year}-{month}")
             return jsonify({"message": "承認を取り消しました", "approval_date": None}), 200
         else:
-            # レポート自体が存在しない場合
+            # 承認を取り消そうとしたが、そもそもレポートが存在しなかった場合
             app.logger.warning(f"承認取り消し試行: レポートが存在しません。社員ID={employee_id}, 年月={year}-{month}")
             return jsonify({"error": "対象のレポートが見つかりません"}), 404
 
@@ -513,7 +536,7 @@ def get_attendance_records(employee_id, year, month):
     """指定された社員と年月の勤怠データを、日次・月次集計と共に取得します。
 
     勤怠管理表画面の表示に必要な全ての計算済みデータを返します。
-    DBから作業記録と祝日を取得し、`AttendanceCalculator`モジュールを
+    DBから作業記録と祝日を取得し、外部モジュール`AttendanceCalculator`を
     使用して各日の勤怠サマリーと月次サマリーを計算します。
 
     Args:
@@ -529,35 +552,43 @@ def get_attendance_records(employee_id, year, month):
         db = get_db()
         calculator = AttendanceCalculator()
 
+        # 該当月の作業記録をDBから取得し、日付(day)をキーにした辞書に変換
         cursor = db.execute("""
             SELECT * FROM work_records
             WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
         """, (employee_id, f"{year:04d}", f"{month:02d}"))
         records_map = {int(row['date'].split('-')[2]): dict(row) for row in cursor.fetchall()}
 
+        # 該当年の祝日をDBから取得し、高速アクセスのためにセットに変換
         cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (f"{year:04d}",))
         holidays_set = {row['date'] for row in cursor.fetchall()}
 
+        # 月の日数を取得
         _, num_days = calendar.monthrange(year, month)
         all_daily_data = []
 
+        # 1日から末日までループし、各日の勤怠データを生成
         for day in range(1, num_days + 1):
             date_str = f"{year:04d}-{month:02d}-{day:02d}"
-            db_record = records_map.get(day, {})
+            db_record = records_map.get(day, {}) # DBに記録がなければ空の辞書を使用
 
+            # 曜日と、カレンダー上の休日（土日または祝日）かを判定
             weekday = datetime(year, month, day).weekday()
             is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6]
 
+            # 勤怠計算モジュールへの入力データを作成
             calc_input = {
                 'start_time': db_record.get('start_time'),
                 'end_time': db_record.get('end_time'),
                 'break_time': db_record.get('break_time'),
                 'night_break_time': db_record.get('night_break_time'),
-                'holiday_type': db_record.get('holiday_type'),
+                'holiday_type': db_record.get('holiday_type'), # 例: 半休など
                 'is_holiday_from_calendar': is_holiday_from_calendar
             }
+            # 日次サマリーを計算
             daily_summary = calculator.calculate_daily_summary(calc_input)
 
+            # フロントエンドに返す日次データを構築
             daily_data = {
                 "day": day,
                 "date": date_str,
@@ -568,11 +599,12 @@ def get_attendance_records(employee_id, year, month):
                 "end_time": db_record.get('end_time'),
                 "break_time": db_record.get('break_time'),
                 "night_break_time": db_record.get('night_break_time'),
-                "remarks": db_record.get('work_content'),
-                "daily_summary": daily_summary
+                "remarks": db_record.get('work_content'), # 備考欄には作業内容を表示
+                "daily_summary": daily_summary # 計算結果
             }
             all_daily_data.append(daily_data)
 
+        # 全ての日次データから月次サマリーを計算
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data)
 
         app.logger.info(f"勤怠データ取得成功: 社員ID={employee_id}, 年月={year}-{month}")
@@ -589,10 +621,10 @@ def get_attendance_records(employee_id, year, month):
 
 @app.route('/api/attendance_records', methods=['POST'])
 def save_attendance_records():
-    """勤怠管理表からの日次勤怠データを保存（UPSERT）します。
+    """勤怠管理表からの日次勤怠データを保存します（UPSERT処理）。
 
     作業報告書よりも詳細な勤怠情報（勤怠種別、深夜休憩など）を扱います。
-    データが存在しない場合は新規作成、存在する場合は更新します。
+    データが存在しない場合は新規作成（INSERT）、存在する場合は更新（UPDATE）します。
 
     Request Body (JSON):
         {
@@ -618,30 +650,34 @@ def save_attendance_records():
             date_str = record.get('date')
             if not date_str: continue
 
+            # UPSERTのため、まずレコードの存在を確認
             cursor = db.execute(
                 "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
                 (employee_id, date_str)
             )
             record_row = cursor.fetchone()
 
-            # リクエストから送られてきた勤怠種別を取得
             attendance_type = record.get('attendance_type')
 
             # 全日休みの勤怠種別リスト (2:欠勤, 3:有給, 6:代休, 7:振休)
             full_day_off_types = [2, 3, 6, 7]
 
-            # 勤怠種別が全日休みの場合、時刻関連のデータを強制的に "00:00" にする
+            # 勤怠種別が「全日休み」に該当する場合、データの整合性を保つため、
+            # 時刻関連のデータを強制的に "00:00" に上書きします。
+            # これにより、UI上で時刻が入力されていてもDBには保存されず、計算ミスを防ぎます。
             if attendance_type in full_day_off_types:
                 start_time = "00:00"
                 end_time = "00:00"
                 break_time = "00:00"
                 night_break_time = "00:00"
             else:
+                # それ以外の勤怠種別（出勤、午前半休など）の場合は、リクエストの値をそのまま使用
                 start_time = record.get('start_time')
                 end_time = record.get('end_time')
                 break_time = record.get('break_time')
                 night_break_time = record.get('night_break_time')
 
+            # DBに保存するパラメータを辞書として準備
             params = {
                 'employee_id': employee_id,
                 'date': date_str,
@@ -655,6 +691,7 @@ def save_attendance_records():
             }
 
             if record_row:
+                # レコードが存在すればUPDATE
                 params['record_id'] = record_row['record_id']
                 db.execute("""
                     UPDATE work_records SET
@@ -664,6 +701,7 @@ def save_attendance_records():
                     WHERE record_id=:record_id
                 """, params)
             else:
+                # レコードが存在しなければINSERT
                 db.execute("""
                     INSERT INTO work_records (
                         employee_id, date, holiday_type, attendance_type, start_time,
@@ -715,18 +753,20 @@ def get_daily_report(employee_id, date_str):
             return jsonify(dict(report))
         else:
             app.logger.info(f"日報データなし: 社員ID={employee_id}, 日付={date_str}")
-            return jsonify(None)
+            return jsonify(None) # フロントエンドで扱いやすいようにnullを返す
     except Exception as e:
         app.logger.error(f"日報データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/daily_report', methods=['POST'])
 def save_daily_report():
-    """日報データを保存（UPSERT）します。
+    """日報データを保存（UPSERT）し、関連する作業記録も更新します。
 
-    データが存在しない場合は新規作成、存在する場合は更新します。
-    関連する作業記録（work_records）の作業内容（work_content）も同時に更新し、
-    データの一貫性を保証します。
+    データの一貫性を保つため、このエンドポイントでは2つのテーブルを更新します。
+    1. `daily_reports`: 日報の詳細な内容（業務サマリー、課題、所感など）を保存。
+    2. `work_records`: `daily_reports`の`work_summary`（業務サマリー）を
+                       `work_records`の`work_content`（作業内容）にコピーします。
+                       これにより、作業報告書や勤怠管理表にも日報のサマリーが表示されるようになります。
 
     Request Body (JSON):
         {
@@ -738,10 +778,6 @@ def save_daily_report():
             "tomorrow_tasks": str,
             "thoughts": str
         }
-
-    Returns:
-        Response: 保存成功メッセージを含むJSONレスポンス。
-                  データが無効な場合は400、サーバーエラーの場合は500を返します。
     """
     data = request.json
     employee_id = data.get('employee_id')
@@ -754,11 +790,12 @@ def save_daily_report():
         db = get_db()
         cursor = db.cursor()
 
-        # 1. daily_reports テーブルを更新または挿入
+        # 1. daily_reports テーブルをUPSERT
         cursor.execute("SELECT 1 FROM daily_reports WHERE employee_id = ? AND date = ?", (employee_id, date))
         exists = cursor.fetchone()
 
         if exists:
+            # 存在すればUPDATE
             cursor.execute("""
                 UPDATE daily_reports SET
                 work_summary = ?, problems = ?, challenges = ?, tomorrow_tasks = ?, thoughts = ?
@@ -769,6 +806,7 @@ def save_daily_report():
                 employee_id, date
             ))
         else:
+            # 存在しなければINSERT
             cursor.execute("""
                 INSERT INTO daily_reports 
                 (employee_id, date, work_summary, problems, challenges, tomorrow_tasks, thoughts)
@@ -778,12 +816,13 @@ def save_daily_report():
                 data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')
             ))
         
-        # 2. work_records テーブルの work_content も一貫性のために更新または挿入
+        # 2. work_records テーブルの work_content も一貫性のためにUPSERT
         work_summary = data.get('work_summary')
         cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
         work_record = cursor.fetchone()
 
         if work_record:
+            # 存在すればUPDATE
             cursor.execute(
                 "UPDATE work_records SET work_content = ? WHERE record_id = ?",
                 (work_summary, work_record['record_id'])
@@ -809,7 +848,9 @@ def save_daily_report():
 def get_owner_id():
     """'num.id'ファイルからオーナーのIDを読み込みます。
 
-    ファイルが存在しない、または内容が不正な場合は、フォールバックとしてID 1を返します。
+    このファイルはアプリケーションのルートディレクトリに配置されることを想定しています。
+    ファイルが存在しない、または内容が整数でない場合は、
+    フォールバックとしてデフォルトのID 1を返します。
 
     Returns:
         int: オーナーの社員ID。
@@ -821,7 +862,7 @@ def get_owner_id():
             app.logger.info(f"オーナーID ({owner_id}) を num.id から読み込みました。")
             return owner_id
     except (FileNotFoundError, ValueError) as e:
-        app.logger.error(f"num.idファイルの読み込みに失敗しました: {e}")
+        app.logger.error(f"num.idファイルの読み込みに失敗しました ({e})。デフォルトのオーナーID(1)を使用します。")
         return 1
 
 @app.route('/api/owner_info', methods=['GET'])
@@ -846,7 +887,7 @@ def get_owner_info():
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 def _get_employee_company_id(employee_id):
-    """指定された社員IDが所属する会社のIDを取得します。"""
+    """ヘルパー関数: 指定された社員IDが所属する会社のIDを取得します。"""
     try:
         db = get_db()
         cursor = db.execute('SELECT company_id FROM employees WHERE employee_id = ?', (employee_id,))
@@ -859,7 +900,12 @@ def _get_employee_company_id(employee_id):
         return None
 
 def is_valid_owner(owner_id, password):
-    """提供されたIDとパスワードが正規のオーナーのものであるかを検証します。
+    """ヘルパー関数: 提供されたIDとパスワードが正規のオーナーのものであるかを検証します。
+
+    セキュリティの要となる関数です。
+    1. `get_owner_id()`で取得した真のオーナーIDと、リクエストされた`owner_id`が一致するかを確認します。
+    2. データベースに保存されているハッシュ化されたパスワードと、リクエストされた`password`が一致するかを
+       `check_password_hash`で安全に比較します。
 
     Args:
         owner_id (int): 検証するオーナーのID。
@@ -892,7 +938,8 @@ def is_valid_owner(owner_id, password):
 def add_employee():
     """新しい社員を追加します（マスターメンテナンス用）。
 
-    この操作は、リクエストに含まれる認証情報が正規のオーナーのものである
+    この操作は、リクエストに含まれる認証情報が正規のオーナーのものであり、
+    かつ、追加しようとしている社員の所属会社がオーナー自身の所属会社と同じである
     場合にのみ許可されます。
     """
     data = request.json
@@ -900,9 +947,11 @@ def add_employee():
     owner_password = data.get('owner_password')
     target_company_id = data.get('company_id')
 
+    # セキュリティチェック1: 正規のオーナーか？
     if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
+    # セキュリティチェック2: オーナーが所属する会社と、追加対象の社員の会社が同じか？
     owner_company_id = _get_employee_company_id(owner_id)
     if not owner_company_id or owner_company_id != target_company_id:
         app.logger.warning(f"権限のない社員追加試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{target_company_id})の社員を追加しようとしました。")
@@ -912,6 +961,7 @@ def add_employee():
         db = get_db()
         cursor = db.cursor()
 
+        # 新規社員の初期パスワードは '123' に設定
         password_hash = generate_password_hash('123')
 
         cursor.execute("""
@@ -939,16 +989,17 @@ def update_employee(employee_id):
     """既存の社員情報を更新します（マスターメンテナンス用）。
 
     この操作は、正規のオーナーであり、かつオーナー自身の会社の社員情報を
-    更新する場合にのみ許可されます。
+    更新する場合にのみ許可されます。パスワードの更新はこのエンドポイントでは行いません。
     """
     data = request.json
     owner_id = data.get('owner_id')
     owner_password = data.get('owner_password')
 
+    # セキュリティチェック1: 正規のオーナーか？
     if not is_valid_owner(owner_id, owner_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    # オーナーは自身の会社の従業員情報を更新できる
+    # セキュリティチェック2: オーナーと更新対象社員が同じ会社に所属しているか？
     owner_company_id = _get_employee_company_id(owner_id)
     target_company_id = _get_employee_company_id(employee_id)
     if not owner_company_id or owner_company_id != target_company_id:
@@ -969,9 +1020,8 @@ def update_employee(employee_id):
             1 if data.get('retirement_flag') else 0,
             employee_id
         ))
-        app.logger.info(f"社員情報（パスワードを除く）を更新しました: ID={employee_id}")
-
         db.commit()
+        app.logger.info(f"社員情報（パスワードを除く）を更新しました: ID={employee_id}")
         return jsonify({"message": "社員情報を更新しました"}), 200
     except Exception as e:
         db.rollback()
@@ -986,13 +1036,12 @@ def update_employee(employee_id):
 def serve_frontend(path):
     """本番環境でフロントエンドの静的ファイルまたはindex.htmlを配信します。
 
-    リクエストされたパスが`static_folder`内に物理的なファイルとして存在する場合、
-    そのファイルを配信します。これは、CSS、JavaScriptバンドル、画像などのアセットに
-    対応します。
+    リクエストされたパスが`static_folder`（例: '../front_end/dist'）内に
+    物理的なファイルとして存在する場合（例: /static/js/main.js）、そのファイルを配信します。
 
-    パスがファイルとして存在しない場合、Reactアプリケーションのエントリーポイントである
-    `index.html`を配信します。これにより、React Routerのようなクライアントサイドの
-    ルーティングが正しく機能します。
+    パスがファイルとして存在しない場合（例: /users/123）、React Routerなどの
+    クライアントサイドのルーティングが処理できるように、アプリケーションのエントリーポイントである
+    `index.html`を配信します。これにより、URLを直接入力してもReactアプリが正しく表示されます。
 
     Args:
         path (str): リクエストされたパス。
@@ -1003,10 +1052,12 @@ def serve_frontend(path):
     app.logger.info(f"フロントエンド配信リクエスト受信: path='{path}'")
     static_folder_path = app.static_folder
 
+    # リクエストされたパスが物理ファイルとして存在するかチェック
     if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
         app.logger.info(f"静的ファイル '{path}' を配信します。")
         return send_from_directory(static_folder_path, path)
     else:
+        # 存在しない場合は、クライアントサイドのルーティングに任せるためindex.htmlを返す
         app.logger.info("Reactアプリの index.html を配信します。")
         return send_from_directory(static_folder_path, 'index.html')
 
