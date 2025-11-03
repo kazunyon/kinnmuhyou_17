@@ -1,0 +1,20 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "このプロジェクトは、従業員の日々の勤務状況を記録し、月次の作業報告書として簡単に管理・印刷するためのWebアプリケーションです。手作業による時間計算や報告書作成の煩雑さを解消し、正確かつ効率的な勤怠管理を実現することを目的としています。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kazunyon/kinnmuhyou_17.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kazunyon/kinnmuhyou_17/issues"
+  },
+  "homepage": "https://github.com/kazunyon/kinnmuhyou_17#readme"
+}
