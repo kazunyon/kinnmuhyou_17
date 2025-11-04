@@ -37,8 +37,6 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
   const [reports, setReports] = useState([]);
   /** @type {[boolean, Function]} データ読み込み中のフラグの状態管理 */
   const [isLoading, setIsLoading] = useState(false);
-  /** @type {[object, Function]} 祝日データの状態管理 */
-  const [holidays, setHolidays] = useState({});
 
   /** @type {React.MutableRefObject<undefined>} 印刷用コンポーネントへの参照 */
   const printComponentRef = useRef();
@@ -77,7 +75,6 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
           ]);
 
           const holidaysData = holidayResponse.data;
-          setHolidays(holidaysData);
           const workRecordsMap = new Map(workRecordResponse.data.records.map(r => [r.day, r]));
 
           const combinedData = dateList.map((dateStr, i) => {
