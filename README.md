@@ -136,7 +136,7 @@ cd ..
 `waitress` というWSGIサーバーを使用して、バックエンドのFlaskアプリケーションを起動します。`waitress`は、開発用サーバーよりも堅牢で、本番環境での使用に適しています。
 
 ```sh
-waitress-serve --host 0.0.0.0 --port 5000 back_end.app:app
+kinnmuhyou_17\back_end\waitress-serve --host 0.0.0.0 --port 5000 app:app
 ```
 
 -   `--host 0.0.0.0`: サーバーを実行しているマシンのIPアドレスに対するすべてのリクエストを受け付けます。これにより、他のコンピューターからサーバーにアクセスできます。
