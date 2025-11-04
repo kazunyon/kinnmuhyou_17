@@ -40,7 +40,7 @@ const toJapaneseEra = (date) => {
  * @returns {JSX.Element} レンダリングされた作業報告書スクリーン。
  */
 const ReportScreen = ({
-  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
+  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
   approvalDate, ownerName,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
@@ -74,6 +74,22 @@ const ReportScreen = ({
    */
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
   const months = Array.from({ length: 12 }, (_, i) => i);
+
+  // 月次サマリー表示用のテキストを生成
+  const summaryText = (() => {
+    if (!monthlySummary) return null;
+    const summaryMapping = {
+      absent_days: '欠勤', paid_holidays: '有給', compensatory_holidays: '代休',
+      transfer_holidays: '振休', late_days: '遅刻', early_leave_days: '早退',
+      flex_days: 'フレックス', direct_travel_days: '直行/直帰', statutory_holidays: '法定休',
+      scheduled_holidays: '所定休', special_holidays: '特別休',
+    };
+    const summaryItems = Object.entries(monthlySummary)
+      .filter(([key, value]) => summaryMapping[key] && value > 0)
+      .map(([key, value]) => `${summaryMapping[key]}: ${value}`);
+
+    return summaryItems.length > 0 ? summaryItems.join('、 ') : null;
+  })();
 
   return (
     <div className="container mx-auto p-4 bg-white shadow-lg rounded-lg">
@@ -164,6 +180,13 @@ const ReportScreen = ({
           onRowClick={onRowClick}
           isReadOnly={isReadOnly}
         />
+      )}
+
+      {/* 月次サマリー */}
+      {summaryText && (
+        <div className="mt-4 p-2 border-t border-b">
+          {summaryText}
+        </div>
       )}
       
       {/* 特記事項 */}
