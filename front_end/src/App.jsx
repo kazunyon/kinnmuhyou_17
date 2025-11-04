@@ -33,7 +33,7 @@ function App() {
   /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: 1) */
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
   /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 2025年10月) */
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1));
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   /** @type {[Array<object>, Function]} 1ヶ月分の作業記録の状態管理 */
   const [workRecords, setWorkRecords] = useState([]);
