@@ -11,7 +11,7 @@ import { getDay, format } from 'date-fns';
  * @param {Function} props.onWorkRecordsChange - 作業記録データが変更されたときのコールバック関数
  * @param {Function} props.onRowClick - テーブルの行がダブルクリックされたときのコールバック関数
  */
-const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWorkRecordsChange, onRowClick, isReadOnly }) => {
+const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWorkRecordsChange, onMonthlySummaryChange, onRowClick, isReadOnly }) => {
   // クリックで選択された行のインデックスを管理するstate
   const [selectedRow, setSelectedRow] = useState(null);
   
@@ -217,26 +217,53 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
             <td className="border border-gray-300 p-1">{minutesToTime(totalWorkTimeMinutes)}</td>
             <td colSpan="6" className="border border-gray-300 p-1"></td>
           </tr>
-          {/* --- 月次集計フッター1行目 --- */}
+          {/* --- 月次集計フッター --- */}
           {monthlySummary && (
             <>
-              <tr className="bg-gray-100 text-xs">
+              {/* 1行目: ヘッダー */}
+              <tr className="bg-gray-100 text-xs text-center">
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">出勤日数</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.working_days || 0}日</td>
-                <td className="border border-gray-300 p-1 font-semibold">欠勤</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.absent_days || 0}日</td>
-                <td className="border border-gray-300 p-1 font-semibold">有給</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.paid_holidays || 0}日</td>
-                <td className="border border-gray-300 p-1 font-semibold">代休</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.compensatory_holidays || 0}日</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">欠勤</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">有給</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="3">代休</td>
               </tr>
-              {/* --- 月次集計フッター2行目 --- */}
-              <tr className="bg-gray-100 text-xs">
+              {/* 1行目: データ */}
+              <tr className="bg-white text-xs text-center">
+                <td className="border border-gray-300 p-1" colSpan="2">{monthlySummary.working_days || 0}日</td>
+                <td className="border border-gray-300 p-0" colSpan="2">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.absent_days || 0} onChange={(e) => onMonthlySummaryChange('absent_days', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
+                <td className="border border-gray-300 p-0" colSpan="2">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.paid_holidays || 0} onChange={(e) => onMonthlySummaryChange('paid_holidays', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
+                <td className="border border-gray-300 p-0" colSpan="3">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.compensatory_holidays || 0} onChange={(e) => onMonthlySummaryChange('compensatory_holidays', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
+              </tr>
+              {/* 2行目: ヘッダー */}
+              <tr className="bg-gray-100 text-xs text-center">
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">振休</td>
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">遅刻</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.late_days || 0}回</td>
-                <td className="border border-gray-300 p-1 font-semibold">早退</td>
-                <td className="border border-gray-300 p-1">{monthlySummary.early_leave_days || 0}回</td>
-                <td className="border border-gray-300 p-1 font-semibold">休日出勤</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">早退</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="3">休日出勤</td>
+              </tr>
+              {/* 2行目: データ */}
+              <tr className="bg-white text-xs text-center">
+                <td className="border border-gray-300 p-0" colSpan="2">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.substitute_holidays || 0} onChange={(e) => onMonthlySummaryChange('substitute_holidays', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
+                <td className="border border-gray-300 p-0" colSpan="2">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.late_days || 0} onChange={(e) => onMonthlySummaryChange('late_days', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
+                <td className="border border-gray-300 p-0" colSpan="2">
+                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
+                    value={monthlySummary.early_leave_days || 0} onChange={(e) => onMonthlySummaryChange('early_leave_days', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
+                </td>
                 <td className="border border-gray-300 p-1" colSpan="3">{monthlySummary.holiday_work_days || 0}日</td>
               </tr>
             </>

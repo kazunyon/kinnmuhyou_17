@@ -52,6 +52,8 @@ function App() {
   const [initialSpecialNotes, setInitialSpecialNotes] = useState("");
   /** @type {[string|null, Function]} 承認日の初期状態 */
   const [initialApprovalDate, setInitialApprovalDate] = useState(null);
+  /** @type {[object|null, Function]} 月次集計データの初期状態 */
+  const [initialMonthlySummary, setInitialMonthlySummary] = useState(null);
   /** @type {[boolean, Function]} 作業報告書画面が変更されたかどうかの状態管理 */
   const [isReportScreenDirty, setIsReportScreenDirty] = useState(false);
   /** @type {[boolean, Function]} 日報が更新されたかどうかの状態管理 */
@@ -151,7 +153,11 @@ function App() {
 
         const newSpecialNotes = recordsRes.data.special_notes || "";
         const newApprovalDate = recordsRes.data.approval_date || null;
-        const newMonthlySummary = recordsRes.data.monthly_summary || null;
+        const newMonthlySummary = recordsRes.data.monthly_summary || {};
+        // APIから 'substitute_holidays' が返されない場合に備えてデフォルト値を設定
+        if (newMonthlySummary.substitute_holidays === undefined) {
+          newMonthlySummary.substitute_holidays = 0;
+        }
 
         setWorkRecords(newRecords);
         setInitialWorkRecords(newRecords);
@@ -160,6 +166,7 @@ function App() {
         setApprovalDate(newApprovalDate);
         setInitialApprovalDate(newApprovalDate);
         setMonthlySummary(newMonthlySummary);
+        setInitialMonthlySummary(newMonthlySummary);
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
         setHasDailyReportBeenUpdated(false);
@@ -192,9 +199,10 @@ function App() {
       JSON.stringify(workRecords) !== JSON.stringify(initialWorkRecords) ||
       specialNotes !== initialSpecialNotes ||
       approvalDate !== initialApprovalDate ||
+      JSON.stringify(monthlySummary) !== JSON.stringify(initialMonthlySummary) ||
       hasDailyReportBeenUpdated;
     setIsReportScreenDirty(isDirty);
-  }, [workRecords, specialNotes, approvalDate, initialWorkRecords, initialSpecialNotes, initialApprovalDate, hasDailyReportBeenUpdated]);
+  }, [workRecords, specialNotes, approvalDate, monthlySummary, initialWorkRecords, initialSpecialNotes, initialApprovalDate, initialMonthlySummary, hasDailyReportBeenUpdated]);
   
   // --- イベントハンドラ ---
 
@@ -258,7 +266,8 @@ function App() {
         year,
         month,
         records: workRecords,
-        special_notes: specialNotes
+        special_notes: specialNotes,
+        monthly_summary: monthlySummary,
       };
       const response = await axios.post(`${API_URL}/work_records`, payload);
       setMessage(response.data.message);
@@ -267,6 +276,7 @@ function App() {
       setInitialWorkRecords(workRecords);
       setInitialSpecialNotes(specialNotes);
       setInitialApprovalDate(approvalDate);
+      setInitialMonthlySummary(monthlySummary);
       setIsReportScreenDirty(false);
       setHasDailyReportBeenUpdated(false);
 
@@ -326,6 +336,15 @@ function App() {
     } else {
       setCurrentDate(newDate);
     }
+  };
+
+  /**
+   * 月次集計データのフィールドを更新します。
+   * @param {string} field - 更新するフィールド名。
+   * @param {string | number} value - 新しい値。
+   */
+  const handleMonthlySummaryChange = (field, value) => {
+    setMonthlySummary(prev => ({ ...prev, [field]: value }));
   };
 
   /**
@@ -395,6 +414,7 @@ function App() {
         onDateChange={handleChangeDate}
         onWorkRecordsChange={setWorkRecords}
         onSpecialNotesChange={setSpecialNotes}
+        onMonthlySummaryChange={handleMonthlySummaryChange}
         onSave={handleSave}
         onPrint={handlePrint}
         onApprove={handleApprove}

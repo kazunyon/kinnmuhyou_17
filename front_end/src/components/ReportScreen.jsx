@@ -42,7 +42,7 @@ const toJapaneseEra = (date) => {
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
   approvalDate, ownerName,
-  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
+  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
@@ -162,6 +162,7 @@ const ReportScreen = ({
           holidays={holidays}
           monthlySummary={monthlySummary}
           onWorkRecordsChange={onWorkRecordsChange}
+          onMonthlySummaryChange={onMonthlySummaryChange}
           onRowClick={onRowClick}
           isReadOnly={isReadOnly}
         />
