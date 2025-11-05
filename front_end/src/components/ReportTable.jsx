@@ -11,7 +11,7 @@ import { getDay, format } from 'date-fns';
  * @param {Function} props.onWorkRecordsChange - 作業記録データが変更されたときのコールバック関数
  * @param {Function} props.onRowClick - テーブルの行がダブルクリックされたときのコールバック関数
  */
-const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, onRowClick, isReadOnly }) => {
+const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWorkRecordsChange, onRowClick, isReadOnly }) => {
   // クリックで選択された行のインデックスを管理するstate
   const [selectedRow, setSelectedRow] = useState(null);
   
@@ -217,6 +217,30 @@ const ReportTable = ({ currentDate, workRecords, holidays, onWorkRecordsChange, 
             <td className="border border-gray-300 p-1">{minutesToTime(totalWorkTimeMinutes)}</td>
             <td colSpan="6" className="border border-gray-300 p-1"></td>
           </tr>
+          {/* --- 月次集計フッター1行目 --- */}
+          {monthlySummary && (
+            <>
+              <tr className="bg-gray-100 text-xs">
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">出勤日数</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.working_days || 0}日</td>
+                <td className="border border-gray-300 p-1 font-semibold">欠勤</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.absent_days || 0}日</td>
+                <td className="border border-gray-300 p-1 font-semibold">有給</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.paid_holidays || 0}日</td>
+                <td className="border border-gray-300 p-1 font-semibold">代休</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.compensatory_holidays || 0}日</td>
+              </tr>
+              {/* --- 月次集計フッター2行目 --- */}
+              <tr className="bg-gray-100 text-xs">
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">遅刻</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.late_days || 0}回</td>
+                <td className="border border-gray-300 p-1 font-semibold">早退</td>
+                <td className="border border-gray-300 p-1">{monthlySummary.early_leave_days || 0}回</td>
+                <td className="border border-gray-300 p-1 font-semibold">休日出勤</td>
+                <td className="border border-gray-300 p-1" colSpan="3">{monthlySummary.holiday_work_days || 0}日</td>
+              </tr>
+            </>
+          )}
         </tfoot>
       </table>
     </div>

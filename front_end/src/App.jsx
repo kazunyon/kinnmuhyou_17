@@ -43,6 +43,8 @@ function App() {
   const [specialNotes, setSpecialNotes] = useState("");
   /** @type {[string|null, Function]} 承認日の状態管理 */
   const [approvalDate, setApprovalDate] = useState(null);
+  /** @type {[object|null, Function]} 月次集計データの状態管理 */
+  const [monthlySummary, setMonthlySummary] = useState(null);
 
   /** @type {[Array<object>, Function]} 作業記録の初期状態 */
   const [initialWorkRecords, setInitialWorkRecords] = useState([]);
@@ -149,6 +151,7 @@ function App() {
 
         const newSpecialNotes = recordsRes.data.special_notes || "";
         const newApprovalDate = recordsRes.data.approval_date || null;
+        const newMonthlySummary = recordsRes.data.monthly_summary || null;
 
         setWorkRecords(newRecords);
         setInitialWorkRecords(newRecords);
@@ -156,6 +159,7 @@ function App() {
         setInitialSpecialNotes(newSpecialNotes);
         setApprovalDate(newApprovalDate);
         setInitialApprovalDate(newApprovalDate);
+        setMonthlySummary(newMonthlySummary);
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
         setHasDailyReportBeenUpdated(false);
@@ -381,6 +385,7 @@ function App() {
         workRecords={workRecords}
         holidays={holidays}
         specialNotes={specialNotes}
+        monthlySummary={monthlySummary}
         approvalDate={approvalDate}
         ownerName={ownerName}
         isLoading={isLoading}

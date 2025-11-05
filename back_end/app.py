@@ -255,55 +255,87 @@ def get_holidays(year):
 
 @app.route('/api/work_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_work_records(employee_id, year, month):
-    """指定された社員と年月の作業記録および月次特記事項を取得します。
+    """指定された社員と年月の作業記録、月次特記事項、および月次集計サマリーを取得します。
 
-    作業報告書画面の初期表示に使用されます。日次記録と月次の特記事項の両方を返します。
-
-    Args:
-        employee_id (int): 社員ID。
-        year (int): 対象年。
-        month (int): 対象月。
-
-    Returns:
-        Response: 日次記録のリストと特記事項を含むJSONレスポンス。
-                  例: {
-                        "records": [{"day": 1, "start_time": "09:00", ...}, ...],
-                        "special_notes": "月次報告です。"
-                      }
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+    作業報告書画面の表示に必要なデータをまとめて返します。
+    日次記録はDBに存在するレコードのみを返し、フロントエンド側で月の全日分に展開することを想定しています。
+    月次集計は、AttendanceCalculatorを使用してサーバーサイドで計算します。
     """
     try:
         db = get_db()
+        calculator = AttendanceCalculator()
         year_str = str(year)
         month_str = f"{month:02d}"
 
-        # 該当月の作業記録を取得
+        # 1. 該当月の作業記録をDBから取得（計算に必要な全カラムを取得）
+        #    フロントエンドが期待するスパースな（存在する日のみの）リストを生成
         records_cursor = db.execute("""
-            SELECT CAST(strftime('%d', date) AS INTEGER) as day, start_time, end_time, break_time, work_content
+            SELECT *, CAST(strftime('%d', date) AS INTEGER) as day
             FROM work_records
             WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
         """, (employee_id, year_str, month_str))
-        records = [dict(row) for row in records_cursor.fetchall()]
+        records_for_display = [dict(row) for row in records_cursor.fetchall()]
 
-        # 該当月の月次レポート（特記事項や承認日）を取得
+        # 2. 月次集計のために、取得したデータを日付をキーとする辞書に変換
+        records_map = {r['day']: r for r in records_for_display}
+
+        # 3. 集計計算に必要な祝日データを取得
+        holidays_cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (year_str,))
+        holidays_set = {row['date'] for row in holidays_cursor.fetchall()}
+
+        # 4. 月の全日をループして、日次サマリーを計算し、月次集計のインプットを作成
+        _, num_days = calendar.monthrange(year, month)
+        all_daily_data_for_summary = []
+        for day in range(1, num_days + 1):
+            date_str = f"{year:04d}-{month:02d}-{day:02d}"
+            db_record = records_map.get(day, {})  # その日の記録がなければ空の辞書
+
+            weekday = datetime(year, month, day).weekday()
+            is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6]
+
+            # 日次サマリー計算用の入力データを作成
+            calc_input = {
+                'start_time': db_record.get('start_time'),
+                'end_time': db_record.get('end_time'),
+                'break_time': db_record.get('break_time'),
+                'night_break_time': db_record.get('night_break_time'),
+                'holiday_type': db_record.get('holiday_type'),
+                'is_holiday_from_calendar': is_holiday_from_calendar
+            }
+            daily_summary = calculator.calculate_daily_summary(calc_input)
+
+            # 月次サマリー計算用の入力データを作成
+            summary_input_record = {
+                "attendance_type": db_record.get('attendance_type'),
+                "daily_summary": daily_summary
+            }
+            all_daily_data_for_summary.append(summary_input_record)
+
+        # 5. 月次サマリーを計算
+        monthly_summary = calculator.calculate_monthly_summary(all_daily_data_for_summary)
+
+        # 6. 月次レポート（特記事項や承認日）を取得
         notes_cursor = db.execute("""
             SELECT special_notes, approval_date FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
         """, (employee_id, year, month))
         report_row = notes_cursor.fetchone()
-
-        # レポートが存在すればその値を、なければデフォルト値を設定
         special_notes = report_row['special_notes'] if report_row else ""
         approval_date = report_row['approval_date'] if report_row else None
 
-        app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records)}件")
+        app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records_for_display)}件")
+
+        # 7. 全てのデータをまとめてJSONで返す
         return jsonify({
-            "records": records,
+            "records": records_for_display,
             "special_notes": special_notes,
-            "approval_date": approval_date
+            "approval_date": approval_date,
+            "monthly_summary": monthly_summary  # 月次集計データを追加
         })
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/work_records', methods=['POST'])
