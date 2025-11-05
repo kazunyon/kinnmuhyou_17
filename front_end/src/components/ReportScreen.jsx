@@ -40,7 +40,7 @@ const toJapaneseEra = (date) => {
  * @returns {JSX.Element} レンダリングされた作業報告書スクリーン。
  */
 const ReportScreen = ({
-  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes,
+  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
   approvalDate, ownerName,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
@@ -160,6 +160,7 @@ const ReportScreen = ({
           currentDate={currentDate}
           workRecords={workRecords}
           holidays={holidays}
+          monthlySummary={monthlySummary}
           onWorkRecordsChange={onWorkRecordsChange}
           onRowClick={onRowClick}
           isReadOnly={isReadOnly}
