@@ -314,14 +314,32 @@ def get_work_records(employee_id, year, month):
         # 5. 月次サマリーを計算
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data_for_summary)
 
-        # 6. 月次レポート（特記事項や承認日）を取得
-        notes_cursor = db.execute("""
-            SELECT special_notes, approval_date FROM monthly_reports
+        # 6. DBに保存された月次レポート情報（特記事項、承認日、手入力の集計項目）を取得
+        report_cursor = db.execute("""
+            SELECT * FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
         """, (employee_id, year, month))
-        report_row = notes_cursor.fetchone()
-        special_notes = report_row['special_notes'] if report_row else ""
-        approval_date = report_row['approval_date'] if report_row else None
+        report_row = report_cursor.fetchone()
+
+        special_notes = ""
+        approval_date = None
+
+        # 手入力の集計項目のデフォルト値
+        manual_summary_fields = {
+            'absent_days': 0, 'paid_holidays': 0, 'compensatory_holidays': 0,
+            'substitute_holidays': 0, 'late_days': 0, 'early_leave_days': 0, 'holiday_work_days': 0
+        }
+
+        if report_row:
+            # レポートが存在する場合、DBの値で更新
+            special_notes = report_row['special_notes'] or ""
+            approval_date = report_row['approval_date']
+            for field in manual_summary_fields.keys():
+                if report_row[field] is not None:
+                    manual_summary_fields[field] = report_row[field]
+
+        # 計算されたサマリーと手入力のサマリーをマージ
+        monthly_summary.update(manual_summary_fields)
 
         app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records_for_display)}件")
 
@@ -330,7 +348,7 @@ def get_work_records(employee_id, year, month):
             "records": records_for_display,
             "special_notes": special_notes,
             "approval_date": approval_date,
-            "monthly_summary": monthly_summary  # 月次集計データを追加
+            "monthly_summary": monthly_summary
         })
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
@@ -367,6 +385,7 @@ def save_work_records():
     month = data.get('month')
     records = data.get('records')
     special_notes = data.get('special_notes')
+    monthly_summary = data.get('monthly_summary', {})
 
     if not all([employee_id, year, month, isinstance(records, list)]):
         app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
@@ -380,24 +399,49 @@ def save_work_records():
 
     db = get_db()
     try:
-        # 1. 月次レポートの特記事項をUPSERT
+        # 1. 月次レポート（特記事項と月次集計）をUPSERT
         cursor = db.execute(
             "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
             (employee_id, year, month)
         )
         report_row = cursor.fetchone()
+
+        # UPSERT用のパラメータを準備
+        report_params = {
+            "employee_id": employee_id,
+            "year": year,
+            "month": month,
+            "special_notes": special_notes,
+            "absent_days": monthly_summary.get('absent_days'),
+            "paid_holidays": monthly_summary.get('paid_holidays'),
+            "compensatory_holidays": monthly_summary.get('compensatory_holidays'),
+            "substitute_holidays": monthly_summary.get('substitute_holidays'),
+            "late_days": monthly_summary.get('late_days'),
+            "early_leave_days": monthly_summary.get('early_leave_days'),
+            "holiday_work_days": monthly_summary.get('holiday_work_days')
+        }
+
         if report_row:
             # 存在すればUPDATE
-            db.execute(
-                "UPDATE monthly_reports SET special_notes = ? WHERE report_id = ?",
-                (special_notes, report_row['report_id'])
-            )
+            report_params["report_id"] = report_row['report_id']
+            db.execute("""
+                UPDATE monthly_reports SET
+                special_notes = :special_notes, absent_days = :absent_days, paid_holidays = :paid_holidays,
+                compensatory_holidays = :compensatory_holidays, substitute_holidays = :substitute_holidays,
+                late_days = :late_days, early_leave_days = :early_leave_days, holiday_work_days = :holiday_work_days
+                WHERE report_id = :report_id
+            """, report_params)
         else:
             # 存在しなければINSERT
-            db.execute(
-                "INSERT INTO monthly_reports (employee_id, year, month, special_notes) VALUES (?, ?, ?, ?)",
-                (employee_id, year, month, special_notes)
-            )
+            db.execute("""
+                INSERT INTO monthly_reports (
+                    employee_id, year, month, special_notes, absent_days, paid_holidays,
+                    compensatory_holidays, substitute_holidays, late_days, early_leave_days, holiday_work_days
+                ) VALUES (
+                    :employee_id, :year, :month, :special_notes, :absent_days, :paid_holidays,
+                    :compensatory_holidays, :substitute_holidays, :late_days, :early_leave_days, :holiday_work_days
+                )
+            """, report_params)
 
         # 2. 日次作業記録をループでUPSERT
         for record in records:

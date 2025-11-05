@@ -56,6 +56,13 @@ CREATE TABLE monthly_reports (
     month INTEGER NOT NULL,
     special_notes TEXT,
     approval_date TEXT, -- 承認日 (YYYY-MM-DD)
+    absent_days INTEGER DEFAULT 0,
+    paid_holidays INTEGER DEFAULT 0,
+    compensatory_holidays INTEGER DEFAULT 0,
+    substitute_holidays INTEGER DEFAULT 0,
+    late_days INTEGER DEFAULT 0,
+    early_leave_days INTEGER DEFAULT 0,
+    holiday_work_days INTEGER DEFAULT 0,
     UNIQUE(employee_id, year, month),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );
