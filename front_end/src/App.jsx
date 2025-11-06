@@ -406,7 +406,6 @@ function App() {
         specialNotes={specialNotes}
         monthlySummary={monthlySummary}
         approvalDate={approvalDate}
-        ownerName={ownerName}
         isLoading={isLoading}
         message={message}
         isReadOnly={!isViewingOwnerReport}
@@ -478,7 +477,6 @@ function App() {
           specialNotes={specialNotes}
           monthlySummary={monthlySummary}
           approvalDate={approvalDate}
-          ownerName={ownerName}
         />
       </div>
     </div>
