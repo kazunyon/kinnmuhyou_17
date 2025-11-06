@@ -41,7 +41,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
-  approvalDate, ownerName,
+  approvalDate,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
@@ -137,7 +137,7 @@ const ReportScreen = ({
           >
             {approvalDate ? (
               <div className="text-red-500 text-center">
-                <p>{ownerName?.split(' ')[0] || ''} {new Date(approvalDate).getMonth() + 1}/{new Date(approvalDate).getDate()}</p>
+                <p>{selectedEmployee?.employee_name?.split(' ')[0] || ''} {new Date(approvalDate).getMonth() + 1}/{new Date(approvalDate).getDate()}</p>
                 {!isReadOnly && (
                   <p
                     className="text-blue-600 hover:underline cursor-pointer"

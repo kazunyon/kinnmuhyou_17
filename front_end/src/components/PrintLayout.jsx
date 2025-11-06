@@ -15,12 +15,11 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @param {object} props.holidays - 祝日データ (キー: 'YYYY-MM-DD', 値: 祝日名)。
  * @param {object} props.monthlySummary - 月次集計データ。
  * @param {string} props.approvalDate - 承認日。
- * @param {string} props.ownerName - 承認者名。
  * @param {React.Ref} ref - `react-to-print`が印刷対象を識別するためのref。
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
-  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, approvalDate, ownerName } = props;
+  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, approvalDate } = props;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -92,7 +91,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
             <div className="flex-grow flex items-center justify-center text-red-500 text-xs">
               {approvalDate ? (
                 <div>
-                  <p>{ownerName?.split(' ')[0] || ''}</p>
+                  <p>{employee?.employee_name?.split(' ')[0] || ''}</p>
                   <p>{format(new Date(approvalDate), 'M/d')}</p>
                 </div>
               ) : (
