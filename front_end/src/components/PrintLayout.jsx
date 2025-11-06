@@ -13,11 +13,14 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @param {Date} props.currentDate - 表示対象の年月を示すDateオブジェクト。
  * @param {Array<object>} props.workRecords - 1ヶ月分の勤務記録データの配列。
  * @param {object} props.holidays - 祝日データ (キー: 'YYYY-MM-DD', 値: 祝日名)。
+ * @param {object} props.monthlySummary - 月次集計データ。
+ * @param {string} props.approvalDate - 承認日。
+ * @param {string} props.ownerName - 承認者名。
  * @param {React.Ref} ref - `react-to-print`が印刷対象を識別するためのref。
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
-  const { employee, company, currentDate, workRecords, holidays, specialNotes } = props;
+  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, approvalDate, ownerName } = props;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -77,11 +80,26 @@ const PrintLayout = React.forwardRef((props, ref) => {
         <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>
         <h1 className="text-lg font-bold" style={{ letterSpacing: '0.5em' }}>作業報告書</h1>
       </div>
-      <div className="flex justify-start mb-4 text-sm">
+      <div className="flex justify-between items-start mb-4 text-sm">
         <div>
           <p>会社名：{company?.company_name}</p>
           <p>部署  ：{employee?.department_name}</p>
           <p>氏名  ：{employee?.employee_name}</p>
+        </div>
+        <div className="flex" style={{ marginRight: '20px' }}>
+          <div className="flex flex-col text-center border border-black" style={{ width: '70px', height: '70px' }}>
+            <div className="border-b border-black h-1/4 flex items-center justify-center text-xs">承認</div>
+            <div className="flex-grow flex items-center justify-center text-red-500 text-xs">
+              {approvalDate ? (
+                <div>
+                  <p>{ownerName?.split(' ')[0] || ''}</p>
+                  <p>{format(new Date(approvalDate), 'M/d')}</p>
+                </div>
+              ) : (
+                <div style={{ width: '40px', height: '40px' }}></div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -129,16 +147,43 @@ const PrintLayout = React.forwardRef((props, ref) => {
                 <td className="border border-black p-1 text-center font-bold">{minutesToTime(totalWorkTimeMinutes)}</td>
                 <td className="border border-black p-1"></td>
             </tr>
-            <tr>
-                <td className="border border-black p-1 align-top" rowSpan="4">特記事項</td>
-                <td className="p-1 align-top border-t border-r border-black whitespace-pre-wrap" colSpan="3" rowSpan="4" style={{ height: '112px' }}>{specialNotes}</td>
-            </tr>
-            {Array.from({ length: 3 }).map((_, i) => (
-                <tr key={`note-fill-${i}`} className="hidden">
-                    <td colSpan="3"></td>
-                </tr>
-            ))}
         </tfoot>
+      </table>
+
+      {/* 勤怠サマリー */}
+      <table className="w-full border-collapse border border-black text-xs mt-2" style={{ tableLayout: 'fixed' }}>
+        <tbody>
+          <tr>
+            <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">出勤日数</td>
+            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.work_days ?? 0} 日</td>
+            <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">欠勤</td>
+            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.absent_days ?? 0} 日</td>
+            <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">有給</td>
+            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.paid_holidays ?? 0} 日</td>
+            <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">代休</td>
+            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.compensatory_holidays ?? 0} 日</td>
+          </tr>
+          <tr>
+            <td className="border border-black p-1 text-center bg-gray-200">振休</td>
+            <td className="border border-black p-1 text-center">{monthlySummary?.substitute_holidays ?? 0} 日</td>
+            <td className="border border-black p-1 text-center bg-gray-200">遅刻・早退</td>
+            <td className="border border-black p-1 text-center">{monthlySummary?.late_early_leave_days ?? 0} 回</td>
+            <td className="border border-black p-1 text-center bg-gray-200">休日出勤</td>
+            <td className="border border-black p-1 text-center">{monthlySummary?.holiday_work_days ?? 0} 日</td>
+            <td className="border border-black p-1 bg-gray-200"></td>
+            <td className="border border-black p-1"></td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* 特記事項 */}
+      <table className="w-full border-collapse border border-black text-xs mt-2">
+        <tbody>
+            <tr>
+                <td className="border border-black p-1 align-top bg-gray-200" style={{ width: '10%' }}>特記事項</td>
+                <td className="p-1 align-top whitespace-pre-wrap" style={{ height: '112px' }}>{specialNotes}</td>
+            </tr>
+        </tbody>
       </table>
     </div>
   );

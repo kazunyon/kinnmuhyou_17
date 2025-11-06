@@ -476,6 +476,9 @@ function App() {
           workRecords={workRecords}
           holidays={holidays}
           specialNotes={specialNotes}
+          monthlySummary={monthlySummary}
+          approvalDate={approvalDate}
+          ownerName={ownerName}
         />
       </div>
     </div>
