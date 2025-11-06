@@ -71,18 +71,69 @@ const PrintLayout = React.forwardRef((props, ref) => {
       return total + actualWorkMinutes;
   }, 0);
 
+  // 出勤日数サマリーの計算
+  let workDays = 0;
+  let absenceDays = 0;
+  let paidLeaveDays = 0;
+  let holidayWorkDays = 0;
+
+  Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    const date = new Date(year, month, day);
+    const dayOfWeek = getDay(date);
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const isHoliday = !!holidays[dateStr];
+    const record = workRecords.find(r => r.day === day);
+    const isPaidLeave = record && record.work_content && (record.work_content.includes('有給') || record.work_content.includes('有休'));
+
+    if (isPaidLeave) {
+        paidLeaveDays++;
+    }
+
+    // 勤務記録があるか（有給以外）
+    const hasWorkRecord = record && !isPaidLeave;
+
+    if (hasWorkRecord) {
+        workDays++;
+        if (isWeekend || isHoliday) {
+            holidayWorkDays++;
+        }
+    } else if (!record && !isWeekend && !isHoliday) {
+        // 記録がなく、平日（祝日でない）場合は欠勤
+        absenceDays++;
+    }
+  });
+
+
   return (
     <div ref={ref} className="bg-white text-black print-container">
-      <div className="text-center mb-4">
-        <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>
-        <h1 className="text-lg font-bold" style={{ letterSpacing: '0.5em' }}>作業報告書</h1>
+      <div className="flex justify-between items-start">
+        <div className="text-center mb-4 flex-grow">
+            <h2 className="text-sm font-bold">{format(currentDate, 'yyyy年 M月')}</h2>
+            <h1 className="text-lg font-bold" style={{ letterSpacing: '0.5em' }}>作業報告書</h1>
+        </div>
       </div>
-      <div className="flex justify-start mb-4 text-sm">
+      <div className="flex justify-between items-start mb-4 text-sm">
         <div>
           <p>会社名：{company?.company_name}</p>
           <p>部署  ：{employee?.department_name}</p>
           <p>氏名  ：{employee?.employee_name}</p>
         </div>
+        <table className="border-collapse border border-black text-xs">
+          <tbody>
+            <tr>
+              <td className="border border-black p-1 text-center h-4">承認</td>
+              <td className="border border-black p-1 text-center h-4">検印</td>
+              <td className="border border-black p-1 text-center h-4">担当</td>
+            </tr>
+            <tr>
+              <td className="border border-black p-1 h-12 w-16"></td>
+              <td className="border border-black p-1 h-12 w-16"></td>
+              <td className="border border-black p-1 h-12 w-16"></td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <table className="w-full border-collapse border border-black text-xs" style={{ tableLayout: 'fixed' }}>
@@ -139,6 +190,23 @@ const PrintLayout = React.forwardRef((props, ref) => {
                 </tr>
             ))}
         </tfoot>
+      </table>
+
+      <table className="w-full border-collapse border border-black text-xs mt-4">
+        <tbody>
+          <tr className="bg-gray-200">
+            <td className="border border-black p-1 text-center w-1/4">出勤日数</td>
+            <td className="border border-black p-1 text-center w-1/4">欠勤日数</td>
+            <td className="border border-black p-1 text-center w-1/4">有給休暇</td>
+            <td className="border border-black p-1 text-center w-1/4">休日出勤</td>
+          </tr>
+          <tr>
+            <td className="border border-black p-1 text-center h-6">{workDays} 日</td>
+            <td className="border border-black p-1 text-center h-6">{absenceDays} 日</td>
+            <td className="border border-black p-1 text-center h-6">{paidLeaveDays} 日</td>
+            <td className="border border-black p-1 text-center h-6">{holidayWorkDays} 日</td>
+          </tr>
+        </tbody>
       </table>
     </div>
   );
