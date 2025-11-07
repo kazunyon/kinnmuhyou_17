@@ -225,7 +225,11 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">出勤日数</td>
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">欠勤</td>
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">有給</td>
-                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">代休</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">
+                  <a href="/holiday_difference.docx" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    代休
+                  </a>
+                </td>
                 <td className="border border-gray-300" colSpan="1"></td>
               </tr>
               {/* 1行目: データ */}
@@ -247,11 +251,14 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
               </tr>
               {/* 2行目: ヘッダー */}
               <tr className="bg-gray-100 text-xs text-center">
-                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">振休</td>
+                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">
+                  <a href="/holiday_difference.docx" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                    振休
+                  </a>
+                </td>
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">遅刻</td>
                 <td className="border border-gray-300 p-1 font-semibold" colSpan="2">早退</td>
-                <td className="border border-gray-300 p-1 font-semibold" colSpan="2">休日出勤</td>
-                <td className="border border-gray-300" colSpan="1"></td>
+                <td className="border border-gray-300" colSpan="3"></td>
               </tr>
               {/* 2行目: データ */}
               <tr className="bg-white text-xs text-center">
@@ -267,11 +274,7 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
                   <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
                     value={monthlySummary.early_leave_days || 0} onChange={(e) => onMonthlySummaryChange('early_leave_days', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
                 </td>
-                <td className="border border-gray-300 p-0" colSpan="2">
-                  <input type="number" min="0" max="31" className={`w-full h-full p-1 text-center border-none ${isReadOnly ? 'bg-gray-100' : 'bg-transparent'}`}
-                    value={monthlySummary.holiday_work_days || 0} onChange={(e) => onMonthlySummaryChange('holiday_work_days', parseInt(e.target.value, 10))} readOnly={isReadOnly} />
-                </td>
-                <td className="border border-gray-300" colSpan="1"></td>
+                <td className="border border-gray-300" colSpan="3"></td>
               </tr>
             </>
           )}
