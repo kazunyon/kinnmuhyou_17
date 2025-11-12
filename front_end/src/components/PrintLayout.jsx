@@ -154,7 +154,7 @@ const PrintLayout = React.forwardRef((props, ref) => {
         <tbody>
           <tr>
             <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">出勤日数</td>
-            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.work_days ?? 0} 日</td>
+            <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.working_days ?? 0} 日</td>
             <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">欠勤</td>
             <td className="border border-black p-1 text-center w-[12.5%]">{monthlySummary?.absent_days ?? 0} 日</td>
             <td className="border border-black p-1 text-center bg-gray-200 w-[12.5%]">有給</td>
