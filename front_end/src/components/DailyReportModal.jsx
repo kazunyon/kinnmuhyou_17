@@ -43,6 +43,51 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
+  // --- 明細関連の状態管理 ---
+  const [details, setDetails] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [totalDetailTime, setTotalDetailTime] = useState(0);
+
+  useEffect(() => {
+    const fetchMasters = async () => {
+      try {
+        const [clientsRes, projectsRes] = await Promise.all([
+          axios.get(`${API_URL}/clients`),
+          axios.get(`${API_URL}/projects`)
+        ]);
+        setClients(clientsRes.data);
+        setProjects(projectsRes.data);
+      } catch (error) {
+        console.error("マスタ取得エラー:", error);
+      }
+    };
+    if (isOpen) fetchMasters();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && workRecord) {
+      // 既存の明細があればセットする (workRecordにdetailsが含まれている前提)
+      if (workRecord.details && workRecord.details.length > 0) {
+        setDetails(workRecord.details.map(d => ({
+          client_id: d.client_id,
+          project_id: d.project_id,
+          work_time: d.work_time
+        })));
+      } else {
+        // 新規または明細なし
+        setDetails([]);
+      }
+    }
+  }, [isOpen, workRecord]);
+
+  // 明細合計時間の計算
+  useEffect(() => {
+    const total = details.reduce((sum, d) => sum + (d.work_time || 0), 0);
+    setTotalDetailTime(total);
+  }, [details]);
+
+
   /**
    * モーダルが開いたとき、または主要なpropが変更されたときに日報データを取得します。
    * 親から渡された作業記録を基に時間と作業内容を初期設定し、
@@ -102,11 +147,50 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     }
   };
 
+  // --- 明細操作ハンドラ ---
+  const handleAddDetail = () => {
+    setDetails([...details, { client_id: '', project_id: '', work_time: 0 }]);
+  };
+
+  const handleRemoveDetail = (index) => {
+    const newDetails = [...details];
+    newDetails.splice(index, 1);
+    setDetails(newDetails);
+  };
+
+  const handleDetailChange = (index, field, value) => {
+    const newDetails = [...details];
+    // 取引先変更時は案件をリセット
+    if (field === 'client_id') {
+        newDetails[index].project_id = '';
+    }
+    newDetails[index][field] = value;
+    setDetails(newDetails);
+  };
+
+  // 勤務時間計算（分）
+  const calculateWorkDuration = () => {
+    const [sh, sm] = times.startTime.split(':').map(Number);
+    const [eh, em] = times.endTime.split(':').map(Number);
+    const [bh, bm] = times.breakTime.split(':').map(Number);
+
+    let duration = (eh * 60 + em) - (sh * 60 + sm) - (bh * 60 + bm);
+    return Math.max(0, duration);
+  };
+
   /**
    * 「適用して閉じる」ボタンのハンドラ。
    * 日報データをDBに保存し、親コンポーネントに変更を通知してからモーダルを閉じます。
    */
   const handleApplyAndClose = async () => {
+    // 時間チェック
+    const workDuration = calculateWorkDuration();
+    if (Math.abs(workDuration - totalDetailTime) > 0 && details.length > 0) {
+        if (!window.confirm(`作業明細の合計(${totalDetailTime}分)と実働時間(${workDuration}分)が一致していません。保存しますか？`)) {
+            return;
+        }
+    }
+
     try {
       await axios.post(`${API_URL}/daily_report`, {
         employee_id: employeeId,
@@ -115,14 +199,21 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
         start_time: times.startTime,
         end_time: times.endTime,
         break_time: times.breakTime,
+        details: details // 明細も送信
       });
+
+      // 親への通知: work_contentはサーバー側で生成されるが、即時反映のために
+      // クライアント側でも簡易生成して渡すか、リロードを促すフラグを立てる
+      // ここでは簡易生成はせず、リロードを促すためコールバックには主要データのみ渡す
+      // (App.jsx側で再取得処理が走るように onReportUpdate(true) を呼んでいるのでOK)
 
       onSave({
           day: new Date(date).getDate(),
           start_time: times.startTime,
           end_time: times.endTime,
           break_time: times.breakTime,
-          work_content: reportData.work_summary,
+          work_content: reportData.work_summary, // テキストエリアの値を優先表示、またはサーバー生成値を待つなら空でも
+          details: details // クライアント反映用
       });
 
       onReportUpdate(true);
@@ -209,7 +300,7 @@ ${reportData.thoughts}`;
 
         <div className="mx-auto">
           {/* 時間入力 */}
-          <div className="space-y-2 p-4 border rounded w-full">
+          <div className="space-y-2 p-4 border rounded w-full bg-gray-50">
               {renderTimePicker('startTime', '開始時間')}
               <div className="flex items-center">
                   {renderTimePicker('endTime', '終了時間')}
@@ -228,11 +319,71 @@ ${reportData.thoughts}`;
                       </select>
                   </div>
               </div>
+              <div className="text-right font-bold mt-2">
+                  実働時間: {Math.floor(calculateWorkDuration() / 60)}時間 {calculateWorkDuration() % 60}分 ({calculateWorkDuration()}分)
+              </div>
+          </div>
+
+          {/* 作業明細入力 */}
+          <div className="p-4 border rounded w-full mt-4 bg-blue-50">
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="font-bold">作業内訳 (ディテール)</h3>
+                <button onClick={handleAddDetail} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">+ 行追加</button>
+            </div>
+            <table className="w-full bg-white border">
+                <thead>
+                    <tr className="bg-gray-100">
+                        <th className="p-2 border w-40">取引先</th>
+                        <th className="p-2 border">案件</th>
+                        <th className="p-2 border w-32">時間(分)</th>
+                        <th className="p-2 border w-16"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {details.map((detail, index) => (
+                        <tr key={index}>
+                            <td className="p-2 border">
+                                <select className="w-full p-1 border rounded" value={detail.client_id} onChange={(e) => handleDetailChange(index, 'client_id', parseInt(e.target.value))}>
+                                    <option value="">選択...</option>
+                                    {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+                                </select>
+                            </td>
+                            <td className="p-2 border">
+                                <select className="w-full p-1 border rounded" value={detail.project_id} onChange={(e) => handleDetailChange(index, 'project_id', parseInt(e.target.value))} disabled={!detail.client_id}>
+                                    <option value="">選択...</option>
+                                    {projects.filter(p => p.client_id === detail.client_id).map(p => (
+                                        <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                                    ))}
+                                </select>
+                            </td>
+                            <td className="p-2 border">
+                                <input type="number" className="w-full p-1 border rounded text-right" value={detail.work_time} onChange={(e) => handleDetailChange(index, 'work_time', parseInt(e.target.value) || 0)} step="15" />
+                            </td>
+                            <td className="p-2 border text-center">
+                                <button onClick={() => handleRemoveDetail(index)} className="text-red-500 hover:text-red-700">×</button>
+                            </td>
+                        </tr>
+                    ))}
+                    {details.length === 0 && <tr><td colSpan="4" className="p-2 text-center text-gray-500">明細なし</td></tr>}
+                </tbody>
+                <tfoot>
+                    <tr className="bg-gray-100 font-bold">
+                        <td colSpan="2" className="p-2 text-right border">合計</td>
+                        <td className="p-2 text-right border">{Math.floor(totalDetailTime / 60)}h {totalDetailTime % 60}m</td>
+                        <td className="border"></td>
+                    </tr>
+                </tfoot>
+            </table>
+            {Math.abs(calculateWorkDuration() - totalDetailTime) > 0 && details.length > 0 && (
+                <div className="text-red-600 text-sm mt-1 text-right">
+                    実働時間との差分: {calculateWorkDuration() - totalDetailTime}分
+                </div>
+            )}
           </div>
 
           {/* テキストエリア */}
-          <div className="space-y-4 p-4 border rounded mt-10 w-full">
-            <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
+          <div className="space-y-4 p-4 border rounded mt-4 w-full">
+            <TextAreaField label="作業内容 (明細から自動生成されますが、手動編集も可能です)" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
             <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
             <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
             <TextAreaField label="明日する内容" value={reportData.tomorrow_tasks} onChange={(e) => handleDataChange('tomorrow_tasks', e.target.value)} rows={2} />

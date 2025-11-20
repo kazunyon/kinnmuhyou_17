@@ -45,6 +45,8 @@ function App() {
   const [approvalDate, setApprovalDate] = useState(null);
   /** @type {[object|null, Function]} 月次集計データの状態管理 */
   const [monthlySummary, setMonthlySummary] = useState(null);
+  /** @type {[Array<object>, Function]} 請求先・案件別集計データの状態管理 */
+  const [projectSummary, setProjectSummary] = useState([]);
 
   /** @type {[Array<object>, Function]} 作業記録の初期状態 */
   const [initialWorkRecords, setInitialWorkRecords] = useState([]);
@@ -154,6 +156,8 @@ function App() {
         const newSpecialNotes = recordsRes.data.special_notes || "";
         const newApprovalDate = recordsRes.data.approval_date || null;
         const newMonthlySummary = recordsRes.data.monthly_summary || {};
+        const newProjectSummary = recordsRes.data.project_summary || []; // 追加
+
         // APIから 'substitute_holidays' が返されない場合に備えてデフォルト値を設定
         if (newMonthlySummary.substitute_holidays === undefined) {
           newMonthlySummary.substitute_holidays = 0;
@@ -167,6 +171,7 @@ function App() {
         setInitialApprovalDate(newApprovalDate);
         setMonthlySummary(newMonthlySummary);
         setInitialMonthlySummary(newMonthlySummary);
+        setProjectSummary(newProjectSummary); // 追加
         setHolidays(holidaysRes.data);
         setIsReportScreenDirty(false);
         setHasDailyReportBeenUpdated(false);
@@ -405,6 +410,7 @@ function App() {
         holidays={holidays}
         specialNotes={specialNotes}
         monthlySummary={monthlySummary}
+        projectSummary={projectSummary} // 追加
         approvalDate={approvalDate}
         isLoading={isLoading}
         message={message}

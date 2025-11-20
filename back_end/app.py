@@ -250,6 +250,153 @@ def get_holidays(year):
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 # -----------------------------------------------------------------------------
+# APIエンドポイント: 取引先・案件マスター関連
+# -----------------------------------------------------------------------------
+
+@app.route('/api/clients', methods=['GET'])
+def get_clients():
+    """取引先リストを取得します。"""
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT * FROM clients ORDER BY client_id')
+        clients = [dict(row) for row in cursor.fetchall()]
+        return jsonify(clients)
+    except Exception as e:
+        app.logger.error(f"取引先取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients', methods=['POST'])
+def add_client():
+    """取引先を追加します。"""
+    data = request.json
+    client_name = data.get('client_name')
+    if not client_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute('INSERT INTO clients (client_name) VALUES (?)', (client_name,))
+        db.commit()
+        return jsonify({"message": "追加しました", "client_id": cursor.lastrowid}), 201
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients/<int:client_id>', methods=['PUT'])
+def update_client(client_id):
+    """取引先を更新します。"""
+    data = request.json
+    client_name = data.get('client_name')
+    if not client_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute('UPDATE clients SET client_name = ? WHERE client_id = ?', (client_name, client_id))
+        db.commit()
+        return jsonify({"message": "更新しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients/<int:client_id>', methods=['DELETE'])
+def delete_client(client_id):
+    """取引先を削除します。"""
+    try:
+        db = get_db()
+        # 関連する案件があるか確認
+        cursor = db.execute('SELECT count(*) as count FROM projects WHERE client_id = ?', (client_id,))
+        if cursor.fetchone()['count'] > 0:
+            return jsonify({"error": "この取引先に紐づく案件が存在するため削除できません"}), 400
+
+        db.execute('DELETE FROM clients WHERE client_id = ?', (client_id,))
+        db.commit()
+        return jsonify({"message": "削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    """案件リストを取得します。"""
+    try:
+        db = get_db()
+        # クライアント名も結合して取得
+        cursor = db.execute('''
+            SELECT p.*, c.client_name
+            FROM projects p
+            JOIN clients c ON p.client_id = c.client_id
+            ORDER BY p.project_id
+        ''')
+        projects = [dict(row) for row in cursor.fetchall()]
+        return jsonify(projects)
+    except Exception as e:
+        app.logger.error(f"案件取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects', methods=['POST'])
+def add_project():
+    """案件を追加します。"""
+    data = request.json
+    client_id = data.get('client_id')
+    project_name = data.get('project_name')
+    if not client_id or not project_name:
+        return jsonify({"error": "取引先と案件名は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute('INSERT INTO projects (client_id, project_name) VALUES (?, ?)', (client_id, project_name))
+        db.commit()
+        return jsonify({"message": "追加しました", "project_id": cursor.lastrowid}), 201
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    """案件を更新します。"""
+    data = request.json
+    client_id = data.get('client_id')
+    project_name = data.get('project_name')
+    if not client_id or not project_name:
+        return jsonify({"error": "取引先と案件名は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute('UPDATE projects SET client_id = ?, project_name = ? WHERE project_id = ?', (client_id, project_name, project_id))
+        db.commit()
+        return jsonify({"message": "更新しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """案件を削除します。"""
+    try:
+        db = get_db()
+        # 関連する作業明細があるか確認 (まだテーブルがない場合はエラーになるので注意)
+        try:
+            cursor = db.execute('SELECT count(*) as count FROM work_record_details WHERE project_id = ?', (project_id,))
+            if cursor.fetchone()['count'] > 0:
+                return jsonify({"error": "この案件の使用実績があるため削除できません"}), 400
+        except sqlite3.OperationalError:
+            pass # テーブルがない初期段階は無視
+
+        db.execute('DELETE FROM projects WHERE project_id = ?', (project_id,))
+        db.commit()
+        return jsonify({"message": "削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+# -----------------------------------------------------------------------------
 # APIエンドポイント: 作業報告書関連
 # -----------------------------------------------------------------------------
 
@@ -267,14 +414,24 @@ def get_work_records(employee_id, year, month):
         year_str = str(year)
         month_str = f"{month:02d}"
 
-        # 1. 該当月の作業記録をDBから取得（計算に必要な全カラムを取得）
-        #    フロントエンドが期待するスパースな（存在する日のみの）リストを生成
+        # 1. 該当月の作業記録をDBから取得
         records_cursor = db.execute("""
             SELECT *, CAST(strftime('%d', date) AS INTEGER) as day
             FROM work_records
             WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
         """, (employee_id, year_str, month_str))
         records_for_display = [dict(row) for row in records_cursor.fetchall()]
+
+        # 1.5. 各作業記録に紐づく明細を取得して結合
+        for record in records_for_display:
+            details_cursor = db.execute("""
+                SELECT d.*, c.client_name, p.project_name
+                FROM work_record_details d
+                JOIN clients c ON d.client_id = c.client_id
+                JOIN projects p ON d.project_id = p.project_id
+                WHERE d.record_id = ?
+            """, (record['record_id'],))
+            record['details'] = [dict(row) for row in details_cursor.fetchall()]
 
         # 2. 月次集計のために、取得したデータを日付をキーとする辞書に変換
         records_map = {r['day']: r for r in records_for_display}
@@ -314,7 +471,32 @@ def get_work_records(employee_id, year, month):
         # 5. 月次サマリーを計算
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data_for_summary)
 
-        # 6. DBに保存された月次レポート情報（特記事項、承認日、手入力の集計項目）を取得
+        # 6. クライアント・案件別集計の計算
+        # 全ての明細を集計
+        project_summary_map = {}
+        for record in records_for_display:
+            if 'details' in record:
+                for detail in record['details']:
+                    key = (detail['client_name'], detail['project_name'])
+                    if key not in project_summary_map:
+                        project_summary_map[key] = 0
+                    project_summary_map[key] += detail['work_time']
+
+        # リスト形式に変換
+        project_summary = []
+        for (client_name, project_name), total_minutes in project_summary_map.items():
+            hours = total_minutes / 60
+            project_summary.append({
+                "client_name": client_name,
+                "project_name": project_name,
+                "total_hours": round(hours, 2), # 小数点2位まで
+                "total_minutes": total_minutes
+            })
+
+        # ソート: 取引先名、案件名の順
+        project_summary.sort(key=lambda x: (x['client_name'], x['project_name']))
+
+        # 7. DBに保存された月次レポート情報（特記事項、承認日、手入力の集計項目）を取得
         report_cursor = db.execute("""
             SELECT * FROM monthly_reports
             WHERE employee_id = ? AND year = ? AND month = ?
@@ -343,9 +525,10 @@ def get_work_records(employee_id, year, month):
 
         app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records_for_display)}件")
 
-        # 7. 全てのデータをまとめてJSONで返す
+        # 8. 全てのデータをまとめてJSONで返す
         return jsonify({
             "records": records_for_display,
+            "project_summary": project_summary,
             "special_notes": special_notes,
             "approval_date": approval_date,
             "monthly_summary": monthly_summary
@@ -456,8 +639,31 @@ def save_work_records():
             )
             record_row = cursor.fetchone()
 
+            # 明細からwork_contentを自動生成する処理
+            details = record.get('details', [])
+            generated_work_content = ""
+            if details:
+                # クライアント名・案件名を取得するためにIDから検索が必要だが、
+                # フロントエンドから名前も送ってもらうか、ここでクエリするか。
+                # 簡略化のため、ここでは明細の保存処理を行い、work_contentは
+                # フロントエンドから送られてきたものをそのまま使うか、
+                # 保存後に再構築する。
+                # 要件では「各明細の組み合わせが作業内容となるため...」とあるので、
+                # 自動生成ロジックをここに組み込むのが適切。
+                content_parts = []
+                for d in details:
+                    # 案件名と時間を取得 (フロントエンドから渡される想定、なければDBから引く必要があるがN+1になる)
+                    # ここでは、フロントエンドが project_name 等を含んで送ってくるか、
+                    # あるいはDB IDのみ送ってくるかによる。
+                    # IDのみの場合が多いため、一度ここで保存してからJOINして文字列を作るか、
+                    # 逐次クエリする。
+                    # 今回は、先に明細を保存し、その後に文字列生成を行う手順にする。
+                    pass
+
+            record_id = None
             if record_row:
-                # 存在すればUPDATE
+                record_id = record_row['record_id']
+                # 存在すればUPDATE (work_contentは後で更新するので一旦そのまま、あるいは入力値を採用)
                 db.execute("""
                     UPDATE work_records
                     SET start_time = ?, end_time = ?, break_time = ?, work_content = ?
@@ -465,17 +671,59 @@ def save_work_records():
                 """, (
                     record.get('start_time'), record.get('end_time'),
                     record.get('break_time'), record.get('work_content'),
-                    record_row['record_id']
+                    record_id
                 ))
             else:
                 # 存在しなければINSERT
-                db.execute("""
+                cursor = db.execute("""
                     INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     employee_id, date_str, record.get('start_time'), record.get('end_time'),
                     record.get('break_time'), record.get('work_content')
                 ))
+                record_id = cursor.lastrowid
+
+            # 3. 明細データの保存 (洗い替え)
+            if details is not None: # detailsキーが存在する場合のみ処理
+                # 既存明細削除
+                db.execute("DELETE FROM work_record_details WHERE record_id = ?", (record_id,))
+
+                # 新規明細挿入
+                for detail in details:
+                    client_id = detail.get('client_id')
+                    project_id = detail.get('project_id')
+                    work_time = detail.get('work_time')
+
+                    if client_id and project_id and work_time is not None:
+                        db.execute("""
+                            INSERT INTO work_record_details (record_id, client_id, project_id, work_time)
+                            VALUES (?, ?, ?, ?)
+                        """, (record_id, client_id, project_id, work_time))
+
+                # 4. work_content の自動生成と更新
+                # 保存した明細を読み込み直して文字列生成
+                details_cursor = db.execute("""
+                    SELECT p.project_name, d.work_time
+                    FROM work_record_details d
+                    JOIN projects p ON d.project_id = p.project_id
+                    WHERE d.record_id = ?
+                    ORDER BY d.detail_id
+                """, (record_id,))
+                saved_details = details_cursor.fetchall()
+
+                if saved_details:
+                    content_lines = []
+                    for sd in saved_details:
+                        # 分を時間に変換 (例: 4h, 4.5h)
+                        hours = sd['work_time'] / 60
+                        # 整数の場合は .0 を消す
+                        hours_str = f"{int(hours)}" if hours.is_integer() else f"{hours}"
+                        content_lines.append(f"・{sd['project_name']}({hours_str}h)")
+                    new_work_content = "\n".join(content_lines)
+
+                    # work_recordsを更新
+                    db.execute("UPDATE work_records SET work_content = ? WHERE record_id = ?", (new_work_content, record_id))
 
         db.commit() # 全ての処理が成功したらコミット
         app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
@@ -852,7 +1100,8 @@ def save_daily_report():
             "problems": str,
             "challenges": str,
             "tomorrow_tasks": str,
-            "thoughts": str
+            "thoughts": str,
+            "details": [...] # 明細リスト
         }
     """
     data = request.json
@@ -906,12 +1155,15 @@ def save_daily_report():
         cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
         record_row = cursor.fetchone()
 
+        record_id = None
+
         if record_row:
+            record_id = record_row['record_id']
             # 存在すればUPDATE
             # 日報で入力された勤務時間も更新する
             cursor.execute(
                 "UPDATE work_records SET work_content = ?, start_time = ?, end_time = ?, break_time = ? WHERE record_id = ?",
-                (work_summary, start_time, end_time, break_time, record_row['record_id'])
+                (work_summary, start_time, end_time, break_time, record_id)
             )
         else:
             # 存在しなければINSERT
@@ -920,6 +1172,61 @@ def save_daily_report():
                 "INSERT INTO work_records (employee_id, date, work_content, start_time, end_time, break_time) VALUES (?, ?, ?, ?, ?, ?)",
                 (employee_id, date, work_summary, start_time, end_time, break_time)
             )
+            record_id = cursor.lastrowid
+
+        # 3. 明細データの保存 (詳細がある場合)
+        details = data.get('details')
+        if details is not None: # 空リストの場合も処理するため None チェック
+            # 既存明細削除
+            cursor.execute("DELETE FROM work_record_details WHERE record_id = ?", (record_id,))
+
+            # 新規明細挿入
+            for detail in details:
+                client_id = detail.get('client_id')
+                project_id = detail.get('project_id')
+                work_time = detail.get('work_time')
+
+                if client_id and project_id and work_time is not None:
+                    cursor.execute("""
+                        INSERT INTO work_record_details (record_id, client_id, project_id, work_time)
+                        VALUES (?, ?, ?, ?)
+                    """, (record_id, client_id, project_id, work_time))
+
+            # 4. work_content の自動生成と更新 (明細がある場合、work_summaryは上書きされる)
+            # 保存した明細を読み込み直して文字列生成
+            cursor.execute("""
+                SELECT p.project_name, d.work_time
+                FROM work_record_details d
+                JOIN projects p ON d.project_id = p.project_id
+                WHERE d.record_id = ?
+                ORDER BY d.detail_id
+            """, (record_id,))
+            saved_details = cursor.fetchall()
+
+            if saved_details:
+                content_lines = []
+                for sd in saved_details:
+                    # 分を時間に変換
+                    hours = sd['work_time'] / 60
+                    hours_str = f"{int(hours)}" if hours.is_integer() else f"{hours}"
+                    content_lines.append(f"・{sd['project_name']}({hours_str}h)")
+                new_work_content = "\n".join(content_lines)
+
+                # work_recordsを更新 (daily_reportsのwork_summaryも更新すべきか？)
+                # 要件では「従来のwork_contentは...月次画面上では簡易表示に留めます」
+                # work_recordsは月次画面用なので更新する。
+                # daily_reportsは日報そのものなので、ユーザーが入力したテキストを残すか、同期するか。
+                # ここでは、ユーザーがテキストエリアに入力した内容(data['work_summary'])を優先し、
+                # 明細から生成されたテキストは work_records にのみ反映する形にするか、
+                # あるいは daily_reports にも反映するか。
+                # 日報モーダルでは「明細」と「作業内容テキストエリア」が共存するUIになるか、
+                # テキストエリアが明細から自動生成されるReadonlyになるか。
+                # 要件「従来のwork_content（作業内容テキスト）は...複数明細導入後は、各明細の組み合わせが作業内容となるため...」
+                # とあるので、自動生成が正。したがってdaily_reports側も更新しておくのが親切。
+
+                cursor.execute("UPDATE work_records SET work_content = ? WHERE record_id = ?", (new_work_content, record_id))
+                cursor.execute("UPDATE daily_reports SET work_summary = ? WHERE report_id = (SELECT report_id FROM daily_reports WHERE employee_id = ? AND date = ?)", (new_work_content, employee_id, date))
+
 
         db.commit()
         app.logger.info(f"日報データ保存成功 (work_recordsも更新): 社員ID={employee_id}, 日付={date}")

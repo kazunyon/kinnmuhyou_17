@@ -41,6 +41,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
+  projectSummary, // 追加
   approvalDate,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
@@ -181,6 +182,32 @@ const ReportScreen = ({
           readOnly={isReadOnly}
         ></textarea>
       </div>
+
+      {/* 請求先・案件別集計表 */}
+      {projectSummary && projectSummary.length > 0 && (
+        <div className="mt-8">
+          <h2 className="font-bold text-lg mb-2 border-b border-gray-400 pb-1">請求先・案件別集計表</h2>
+          <table className="min-w-full border-collapse border border-gray-400 text-sm">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="border border-gray-300 p-2 text-left">請求先 (取引先)</th>
+                <th className="border border-gray-300 p-2 text-left">案件名</th>
+                <th className="border border-gray-300 p-2 text-right">合計時間</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectSummary.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  {/* 同じ取引先が連続する場合はセルを結合する等のUI工夫も可能だが、今回は単純リスト表示 */}
+                  <td className="border border-gray-300 p-2">{item.client_name}</td>
+                  <td className="border border-gray-300 p-2">{item.project_name}</td>
+                  <td className="border border-gray-300 p-2 text-right">{item.total_hours}h</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 };

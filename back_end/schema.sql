@@ -1,6 +1,9 @@
 -- データベースのテーブル構造を定義します
 
 -- 既存のテーブルがあれば削除
+DROP TABLE IF EXISTS work_record_details;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS employees;
 DROP TABLE IF EXISTS companies;
 DROP TABLE IF EXISTS holidays;
@@ -32,6 +35,20 @@ CREATE TABLE holidays (
     holiday_name TEXT NOT NULL
 );
 
+-- 取引先マスター
+CREATE TABLE clients (
+    client_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_name TEXT NOT NULL
+);
+
+-- 案件マスター
+CREATE TABLE projects (
+    project_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    project_name TEXT NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients (client_id)
+);
+
 -- 日次勤務記録トラン
 CREATE TABLE work_records (
     record_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +63,18 @@ CREATE TABLE work_records (
     work_content TEXT, -- 作業内容 (作業報告書画面で使用) / 備考 (勤怠管理表画面で使用)
     UNIQUE(employee_id, date),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
+);
+
+-- 作業明細
+CREATE TABLE work_record_details (
+    detail_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    record_id INTEGER NOT NULL,
+    client_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    work_time INTEGER NOT NULL, -- 分単位
+    FOREIGN KEY (record_id) REFERENCES work_records (record_id),
+    FOREIGN KEY (client_id) REFERENCES clients (client_id),
+    FOREIGN KEY (project_id) REFERENCES projects (project_id)
 );
 
 -- 月次レポート情報（特記事項など）
