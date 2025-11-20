@@ -250,6 +250,188 @@ def get_holidays(year):
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 # -----------------------------------------------------------------------------
+# APIエンドポイント: 取引先・案件マスター関連
+# -----------------------------------------------------------------------------
+
+# --- 取引先 (Customer) API ---
+
+@app.route('/api/customers', methods=['GET'])
+def get_customers():
+    """全取引先リストを取得します。"""
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT * FROM customers ORDER BY customer_name')
+        customers = [dict(row) for row in cursor.fetchall()]
+        app.logger.info(f"{len(customers)}件の取引先データを取得しました。")
+        return jsonify(customers)
+    except Exception as e:
+        app.logger.error(f"取引先データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/customers', methods=['POST'])
+def add_customer():
+    """新しい取引先を追加します。"""
+    data = request.json
+    customer_name = data.get('customer_name')
+
+    if not customer_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("INSERT INTO customers (customer_name) VALUES (?)", (customer_name,))
+        db.commit()
+        new_id = cursor.lastrowid
+        app.logger.info(f"新規取引先追加成功: {customer_name}, ID={new_id}")
+        return jsonify({"message": "取引先を追加しました", "customer_id": new_id}), 201
+    except sqlite3.IntegrityError:
+        db.rollback()
+        app.logger.warning(f"取引先追加失敗: '{customer_name}' は既に存在します。")
+        return jsonify({"error": f"取引先 '{customer_name}' は既に存在します"}), 409 # Conflict
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/customers/<int:customer_id>', methods=['PUT'])
+def update_customer(customer_id):
+    """既存の取引先を更新します。"""
+    data = request.json
+    customer_name = data.get('customer_name')
+
+    if not customer_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute("UPDATE customers SET customer_name = ? WHERE customer_id = ?", (customer_name, customer_id))
+        db.commit()
+        app.logger.info(f"取引先情報更新成功: ID={customer_id}")
+        return jsonify({"message": "取引先情報を更新しました"}), 200
+    except sqlite3.IntegrityError:
+        db.rollback()
+        app.logger.warning(f"取引先更新失敗: '{customer_name}' は既に存在します。")
+        return jsonify({"error": f"取引先 '{customer_name}' は既に存在します"}), 409 # Conflict
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/customers/<int:customer_id>', methods=['DELETE'])
+def delete_customer(customer_id):
+    """取引先を削除します。"""
+    try:
+        db = get_db()
+        # 案件が紐付いている場合は削除させない
+        cursor = db.execute("SELECT 1 FROM projects WHERE customer_id = ?", (customer_id,))
+        if cursor.fetchone():
+            return jsonify({"error": "この取引先には案件が紐付いているため削除できません"}), 400
+
+        db.execute("DELETE FROM customers WHERE customer_id = ?", (customer_id,))
+        db.commit()
+        app.logger.info(f"取引先削除成功: ID={customer_id}")
+        return jsonify({"message": "取引先を削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+# --- 案件 (Project) API ---
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    """全案件リストを取引先名付きで取得します。"""
+    try:
+        db = get_db()
+        cursor = db.execute("""
+            SELECT p.project_id, p.project_name, p.customer_id, c.customer_name
+            FROM projects p
+            JOIN customers c ON p.customer_id = c.customer_id
+            ORDER BY c.customer_name, p.project_name
+        """)
+        projects = [dict(row) for row in cursor.fetchall()]
+        app.logger.info(f"{len(projects)}件の案件データを取得しました。")
+        return jsonify(projects)
+    except Exception as e:
+        app.logger.error(f"案件データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects', methods=['POST'])
+def add_project():
+    """新しい案件を追加します。"""
+    data = request.json
+    project_name = data.get('project_name')
+    customer_id = data.get('customer_id')
+
+    if not all([project_name, customer_id]):
+        return jsonify({"error": "案件名と取引先は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("INSERT INTO projects (project_name, customer_id) VALUES (?, ?)", (project_name, customer_id))
+        db.commit()
+        new_id = cursor.lastrowid
+        app.logger.info(f"新規案件追加成功: {project_name}, ID={new_id}")
+        return jsonify({"message": "案件を追加しました", "project_id": new_id}), 201
+    except sqlite3.IntegrityError:
+        db.rollback()
+        app.logger.warning(f"案件追加失敗: 案件 '{project_name}' (取引先ID:{customer_id}) は既に存在します。")
+        return jsonify({"error": "その取引先に同じ名前の案件が既に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    """既存の案件を更新します。"""
+    data = request.json
+    project_name = data.get('project_name')
+    customer_id = data.get('customer_id')
+
+    if not all([project_name, customer_id]):
+        return jsonify({"error": "案件名と取引先は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE projects SET project_name = ?, customer_id = ? WHERE project_id = ?",
+            (project_name, customer_id, project_id)
+        )
+        db.commit()
+        app.logger.info(f"案件情報更新成功: ID={project_id}")
+        return jsonify({"message": "案件情報を更新しました"}), 200
+    except sqlite3.IntegrityError:
+        db.rollback()
+        app.logger.warning(f"案件更新失敗: 案件 '{project_name}' (取引先ID:{customer_id}) は既に存在します。")
+        return jsonify({"error": "その取引先に同じ名前の案件が既に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """案件を削除します。"""
+    try:
+        db = get_db()
+        # 作業明細が紐付いている場合は削除させない
+        cursor = db.execute("SELECT 1 FROM work_details WHERE project_id = ?", (project_id,))
+        if cursor.fetchone():
+            return jsonify({"error": "この案件には作業実績が紐付いているため削除できません"}), 400
+
+        db.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        db.commit()
+        app.logger.info(f"案件削除成功: ID={project_id}")
+        return jsonify({"message": "案件を削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+# -----------------------------------------------------------------------------
 # APIエンドポイント: 作業報告書関連
 # -----------------------------------------------------------------------------
 
@@ -267,8 +449,7 @@ def get_work_records(employee_id, year, month):
         year_str = str(year)
         month_str = f"{month:02d}"
 
-        # 1. 該当月の作業記録をDBから取得（計算に必要な全カラムを取得）
-        #    フロントエンドが期待するスパースな（存在する日のみの）リストを生成
+        # 1. 該当月の作業記録(ヘッダー)をDBから取得
         records_cursor = db.execute("""
             SELECT *, CAST(strftime('%d', date) AS INTEGER) as day
             FROM work_records
@@ -276,7 +457,38 @@ def get_work_records(employee_id, year, month):
         """, (employee_id, year_str, month_str))
         records_for_display = [dict(row) for row in records_cursor.fetchall()]
 
-        # 2. 月次集計のために、取得したデータを日付をキーとする辞書に変換
+        # 2. 取得した作業記録のIDリストを作成し、それらに紐づく作業明細(ディテール)を一括取得
+        record_ids = [r['record_id'] for r in records_for_display]
+        work_details_map = {}
+        if record_ids:
+            details_cursor = db.execute(f"""
+                SELECT
+                    wd.work_detail_id,
+                    wd.work_record_id,
+                    wd.project_id,
+                    p.project_name,
+                    c.customer_id,
+                    c.customer_name,
+                    wd.work_time,
+                    wd.work_description
+                FROM work_details wd
+                JOIN projects p ON wd.project_id = p.project_id
+                JOIN customers c ON p.customer_id = c.customer_id
+                WHERE wd.work_record_id IN ({','.join('?' for _ in record_ids)})
+            """, record_ids)
+
+            # work_record_id をキーにして作業明細を辞書に格納
+            for detail in details_cursor:
+                record_id = detail['work_record_id']
+                if record_id not in work_details_map:
+                    work_details_map[record_id] = []
+                work_details_map[record_id].append(dict(detail))
+
+        # 3. 各作業記録に、取得した作業明細を紐付ける
+        for record in records_for_display:
+            record['work_details'] = work_details_map.get(record['record_id'], [])
+
+        # 4. 月次集計のために、取得したデータを日付をキーとする辞書に変換
         records_map = {r['day']: r for r in records_for_display}
 
         # 3. 集計計算に必要な祝日データを取得
@@ -352,6 +564,55 @@ def get_work_records(employee_id, year, month):
         })
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/monthly_summary/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
+def get_monthly_summary(employee_id, year, month):
+    """指定された年月の作業時間を「取引先別」「案件別」に集計して返します。"""
+    try:
+        db = get_db()
+        year_str = f"{year:04d}"
+        month_str = f"{month:02d}"
+
+        # 指定された社員と年月の作業記録(work_records)のIDを取得
+        # work_recordsを起点にすることで、正しい社員と期間のデータのみを集計対象とする
+        cursor = db.execute("""
+            SELECT record_id FROM work_records
+            WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
+        """, (employee_id, year_str, month_str))
+
+        record_ids = [row['record_id'] for row in cursor.fetchall()]
+
+        if not record_ids:
+            # その月の作業記録がなければ空のリストを返す
+            return jsonify([])
+
+        # 取得したrecord_idに紐づく作業明細(work_details)を集計
+        # GROUP BY を使って 取引先 > 案件 の階層で作業時間を合計する
+        summary_cursor = db.execute(f"""
+            SELECT
+                c.customer_id,
+                c.customer_name,
+                p.project_id,
+                p.project_name,
+                SUM(wd.work_time) as total_work_time
+            FROM work_details wd
+            JOIN projects p ON wd.project_id = p.project_id
+            JOIN customers c ON p.customer_id = c.customer_id
+            WHERE wd.work_record_id IN ({','.join('?' for _ in record_ids)})
+            GROUP BY c.customer_id, c.customer_name, p.project_id, p.project_name
+            ORDER BY c.customer_name, p.project_name
+        """, record_ids)
+
+        summary_data = [dict(row) for row in summary_cursor.fetchall()]
+
+        app.logger.info(f"月次集計データ取得成功: 社員ID={employee_id}, 年月={year}-{month}, {len(summary_data)}件")
+        return jsonify(summary_data)
+
+    except Exception as e:
+        app.logger.error(f"月次集計データ取得エラー: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": "サーバー内部エラー"}), 500
@@ -897,7 +1158,6 @@ def save_daily_report():
             ))
         
         # 2. work_recordsテーブルも更新
-        # 日報の入力はwork_recordsのデータソースでもあるため、こちらにも反映させる
         work_summary = data.get('work_summary')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
@@ -906,27 +1166,53 @@ def save_daily_report():
         cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
         record_row = cursor.fetchone()
 
+        record_id = None
         if record_row:
+            record_id = record_row['record_id']
             # 存在すればUPDATE
-            # 日報で入力された勤務時間も更新する
             cursor.execute(
                 "UPDATE work_records SET work_content = ?, start_time = ?, end_time = ?, break_time = ? WHERE record_id = ?",
-                (work_summary, start_time, end_time, break_time, record_row['record_id'])
+                (work_summary, start_time, end_time, break_time, record_id)
             )
         else:
             # 存在しなければINSERT
-            # 日報で初めてその日のデータが入力される場合、work_recordsにもレコードを作成する
             cursor.execute(
                 "INSERT INTO work_records (employee_id, date, work_content, start_time, end_time, break_time) VALUES (?, ?, ?, ?, ?, ?)",
                 (employee_id, date, work_summary, start_time, end_time, break_time)
             )
+            record_id = cursor.lastrowid
+
+        # 3. work_detailsテーブルを更新 (一度全削除してから再登録)
+        work_details = data.get('work_details', [])
+        if record_id:
+            # まず、既存の明細を削除
+            cursor.execute("DELETE FROM work_details WHERE work_record_id = ?", (record_id,))
+
+            # 新しい明細を登録
+            if isinstance(work_details, list):
+                for detail in work_details:
+                    project_id = detail.get('project_id')
+                    work_time = detail.get('work_time')
+                    # project_id と work_time があれば登録
+                    if project_id and work_time is not None:
+                        cursor.execute("""
+                            INSERT INTO work_details (work_record_id, project_id, work_time, work_description)
+                            VALUES (?, ?, ?, ?)
+                        """, (
+                            record_id,
+                            project_id,
+                            work_time,
+                            detail.get('work_description')
+                        ))
 
         db.commit()
-        app.logger.info(f"日報データ保存成功 (work_recordsも更新): 社員ID={employee_id}, 日付={date}")
+        app.logger.info(f"日報データ保存成功 (work_records, work_detailsも更新): 社員ID={employee_id}, 日付={date}")
         return jsonify({"message": "日報を保存しました"}), 200
     except Exception as e:
         db.rollback()
         app.logger.error(f"日報データ保存エラー: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "サーバー内部エラー"}), 500
 
 # -----------------------------------------------------------------------------

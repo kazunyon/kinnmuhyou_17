@@ -7,6 +7,9 @@ DROP TABLE IF EXISTS holidays;
 DROP TABLE IF EXISTS work_records;
 DROP TABLE IF EXISTS daily_reports;
 DROP TABLE IF EXISTS monthly_reports;
+DROP TABLE IF EXISTS customers;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS work_details;
 
 -- 会社マスター
 CREATE TABLE companies (
@@ -32,7 +35,7 @@ CREATE TABLE holidays (
     holiday_name TEXT NOT NULL
 );
 
--- 日次勤務記録トラン
+-- 日次勤務記録トラン (ヘッダー)
 CREATE TABLE work_records (
     record_id INTEGER PRIMARY KEY AUTOINCREMENT,
     employee_id INTEGER NOT NULL,
@@ -43,7 +46,7 @@ CREATE TABLE work_records (
     end_time TEXT, -- 'HH:MM'形式
     break_time TEXT, -- 'HH:MM'形式 (5:00-22:00の休憩)
     night_break_time TEXT, -- 'HH:MM'形式 (22:00-5:00の休憩)
-    work_content TEXT, -- 作業内容 (作業報告書画面で使用) / 備考 (勤怠管理表画面で使用)
+    work_content TEXT, -- 備考
     UNIQUE(employee_id, date),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
 );
@@ -79,4 +82,30 @@ CREATE TABLE daily_reports (
     thoughts TEXT, -- 所感
     UNIQUE(employee_id, date),
     FOREIGN KEY (employee_id) REFERENCES employees (employee_id)
+);
+
+-- 取引先マスター
+CREATE TABLE customers (
+    customer_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name TEXT NOT NULL UNIQUE
+);
+
+-- 案件マスター
+CREATE TABLE projects (
+    project_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_name TEXT NOT NULL,
+    customer_id INTEGER NOT NULL,
+    UNIQUE(project_name, customer_id),
+    FOREIGN KEY (customer_id) REFERENCES customers (customer_id)
+);
+
+-- 作業明細トラン
+CREATE TABLE work_details (
+    work_detail_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_record_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    work_time REAL NOT NULL, -- 時間単位 (例: 1.5時間)
+    work_description TEXT,
+    FOREIGN KEY (work_record_id) REFERENCES work_records (record_id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects (project_id)
 );

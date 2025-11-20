@@ -43,7 +43,7 @@ const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
   approvalDate,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
-  onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
+  onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onOpenCustomerMaster, onOpenProjectMaster, onOpenMonthlySummary, onRowClick
 }) => {
 
   /**
@@ -101,7 +101,10 @@ const ReportScreen = ({
         <div className="flex justify-end items-center space-x-2">
             {message && <div className="text-green-600 mr-4">{message}</div>}
             <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
-            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
+            <button onClick={onOpenMonthlySummary} className="bg-teal-700 text-white px-4 py-1 rounded hover:bg-teal-600">月次集計</button>
+            <button onClick={onOpenCustomerMaster} className="bg-purple-700 text-white px-4 py-1 rounded hover:bg-purple-600">取引先マスター</button>
+            <button onClick={onOpenProjectMaster} className="bg-indigo-700 text-white px-4 py-1 rounded hover:bg-indigo-600">案件マスター</button>
+            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">社員マスター</button>
             <button
               onClick={onSave}
               className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}

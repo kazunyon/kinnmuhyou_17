@@ -4,6 +4,9 @@ import { format, getDaysInMonth } from 'date-fns';
 import ReportScreen from './components/ReportScreen';
 import DailyReportModal from './components/DailyReportModal';
 import MasterModal from './components/MasterModal';
+import CustomerMasterModal from './components/CustomerMasterModal';
+import ProjectMasterModal from './components/ProjectMasterModal';
+import MonthlySummaryModal from './components/MonthlySummaryModal';
 import DailyReportListModal from './components/DailyReportListModal';
 import PrintLayout from './components/PrintLayout';
 import { useReactToPrint } from 'react-to-print';
@@ -74,6 +77,12 @@ function App() {
   const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false);
   /** @type {[boolean, Function]} マスターメンテナンスモーダルの表示状態 */
   const [isMasterModalOpen, setMasterModalOpen] = useState(false);
+  /** @type {[boolean, Function]} 取引先マスターモーダルの表示状態 */
+  const [isCustomerMasterModalOpen, setCustomerMasterModalOpen] = useState(false);
+  /** @type {[boolean, Function]} 案件マスターモーダルの表示状態 */
+  const [isProjectMasterModalOpen, setProjectMasterModalOpen] = useState(false);
+  /** @type {[boolean, Function]} 月次集計モーダルの表示状態 */
+  const [isMonthlySummaryModalOpen, setMonthlySummaryModalOpen] = useState(false);
   /** @type {[boolean, Function]} 日報一覧モーダルの表示状態 */
   const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false);
 
@@ -420,6 +429,9 @@ function App() {
         onCancelApproval={handleCancelApproval}
         onOpenDailyReportList={() => setDailyReportListModalOpen(true)}
         onOpenMaster={handleOpenMaster}
+        onOpenCustomerMaster={() => setCustomerMasterModalOpen(true)}
+        onOpenProjectMaster={() => setProjectMasterModalOpen(true)}
+        onOpenMonthlySummary={() => setMonthlySummaryModalOpen(true)}
         onRowClick={(record) => {
           const dateStr = format(new Date(currentDate.getFullYear(), currentDate.getMonth(), record.day), 'yyyy-MM-dd');
           handleOpenDailyReport(dateStr);
@@ -456,6 +468,26 @@ function App() {
         setAuth={setMasterAuthState}
         ownerId={ownerId}
         ownerName={ownerName}
+      />
+
+      <CustomerMasterModal
+        isOpen={isCustomerMasterModalOpen}
+        onRequestClose={() => setCustomerMasterModalOpen(false)}
+        auth={masterAuthState}
+      />
+
+      <ProjectMasterModal
+        isOpen={isProjectMasterModalOpen}
+        onRequestClose={() => setProjectMasterModalOpen(false)}
+        auth={masterAuthState}
+      />
+
+      <MonthlySummaryModal
+        isOpen={isMonthlySummaryModalOpen}
+        onRequestClose={() => setMonthlySummaryModalOpen(false)}
+        employeeId={selectedEmployeeId}
+        year={currentDate.getFullYear()}
+        month={currentDate.getMonth() + 1}
       />
 
       <DailyReportListModal
