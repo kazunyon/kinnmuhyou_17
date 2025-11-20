@@ -1,4 +1,6 @@
 import ReportTable from './ReportTable';
+import { useMemo } from 'react';
+
 
 /**
  * 西暦の日付オブジェクトを和暦の年を含む文字列に変換します。
@@ -15,41 +17,40 @@ const toJapaneseEra = (date) => {
 };
 
 /**
+ * "HH:mm" 形式の時刻文字列を、その日の0時からの経過分数に変換する。
+ * @param {string} timeStr - "HH:mm" 形式の時刻文字列
+ * @returns {number} 経過分数。無効な入力の場合は0を返す。
+ */
+const timeToMinutes = (timeStr) => {
+  if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+/**
+ * 分の合計値を "HH:mm" 形式の時刻文字列に変換する。
+ * @param {number} totalMinutes - 合計分数
+ * @returns {string} "HH:mm" 形式の文字列。無効な入力の場合は空文字を返す。
+ */
+const minutesToTime = (totalMinutes) => {
+  if (isNaN(totalMinutes) || totalMinutes < 0) return '';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  // padStartで常に2桁表示にする (例: 7 -> "07")
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+/**
  * 作業報告書のメイン画面UIを提供するコンポーネント。
- * ヘッダー、社員情報、作業報告テーブル、特記事項欄で構成されます。
- * このコンポーネントは状態（state）を持たず、親コンポーネント(App.jsx)から渡された
- * propsを通じて表示と操作を行う「Presentational Component」としての役割を担います。
- * @param {object} props - コンポーネントのプロパティ。
- * @param {object} props.selectedEmployee - 選択中の社員情報。
- * @param {object} props.company - 選択中の社員が所属する会社情報。
- * @param {Date} props.currentDate - 表示対象の年月。
- * @param {Array<object>} props.workRecords - 1ヶ月分の作業記録。
- * @param {object} props.holidays - 祝日データ。
- * @param {string} props.specialNotes - 月次の特記事項。
- * @param {boolean} props.isLoading - データ読み込み中かを示すフラグ。
- * @param {string} props.message - ユーザーへの通知メッセージ。
- * @param {boolean} props.isReadOnly - 表示が読み取り専用かを示すフラグ。
- * @param {Function} props.onDateChange - 年月が変更されたときのコールバック関数。
- * @param {Function} props.onWorkRecordsChange - 作業記録が変更されたときのコールバック関数。
- * @param {Function} props.onSpecialNotesChange - 特記事項が変更されたときのコールバック関数。
- * @param {Function} props.onSave - 保存ボタンクリック時のコールバック関数。
- * @param {Function} props.onPrint - 印刷ボタンクリック時のコールバック関数。
- * @param {Function} props.onOpenDailyReportList - 「日報一覧」ボタンクリック時のコールバック関数。
- * @param {Function} props.onOpenMaster - 「マスター」ボタンクリック時のコールバック関数。
- * @param {Function} props.onRowClick - テーブルの行がクリックされたときのコールバック関数。
- * @returns {JSX.Element} レンダリングされた作業報告書スクリーン。
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
-  approvalDate,
-  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
-  onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
+  approvalDate, isLoading, message, isReadOnly, isReportScreenDirty, billingSummary, // billingSummary を追加
+  onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange, onSave, onPrint,
+  onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick,
+  clients, projects
 }) => {
 
-  /**
-   * 年選択プルダウンの変更をハンドリングします。
-   * @param {React.ChangeEvent<HTMLSelectElement>} e - イベントオブジェクト。
-   */
   const handleYearChange = (e) => {
     const newYear = parseInt(e.target.value, 10);
     const newDate = new Date(currentDate);
@@ -57,10 +58,6 @@ const ReportScreen = ({
     onDateChange(newDate);
   };
 
-  /**
-   * 月選択プルダウンの変更をハンドリングします。
-   * @param {React.ChangeEvent<HTMLSelectElement>} e - イベントオブジェクト。
-   */
   const handleMonthChange = (e) => {
     const newMonth = parseInt(e.target.value, 10);
     const newDate = new Date(currentDate);
@@ -68,10 +65,6 @@ const ReportScreen = ({
     onDateChange(newDate);
   };
   
-  /**
-   * 年月プルダウン用の選択肢配列。
-   * @type {{years: number[], months: number[]}}
-   */
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
   const months = Array.from({ length: 12 }, (_, i) => i);
 
@@ -165,6 +158,8 @@ const ReportScreen = ({
           onMonthlySummaryChange={onMonthlySummaryChange}
           onRowClick={onRowClick}
           isReadOnly={isReadOnly}
+          clients={clients}
+          projects={projects}
         />
       )}
       
@@ -180,6 +175,37 @@ const ReportScreen = ({
           placeholder={isReadOnly ? "オーナーのみ編集可能です。" : "この月の特記事項を入力してください..."}
           readOnly={isReadOnly}
         ></textarea>
+      </div>
+
+      {/* 請求先・案件別 集計表 */}
+      <div className="mt-6">
+        <h2 className="font-bold text-md mb-2">請求先・案件別 集計表</h2>
+        <table className="w-full border-collapse border border-gray-400 text-sm">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border border-gray-300 p-2 w-1/3">請求先</th>
+              <th className="border border-gray-300 p-2 w-1/3">案件</th>
+              <th className="border border-gray-300 p-2 w-1/3">合計時間</th>
+            </tr>
+          </thead>
+          <tbody>
+            {billingSummary && billingSummary.length > 0 ? (
+              billingSummary.map((item, index) => (
+                <tr key={index}>
+                  <td className="border border-gray-300 p-2">{item.client_name}</td>
+                  <td className="border border-gray-300 p-2">{item.project_name}</td>
+                  <td className="border border-gray-300 p-2 text-center">{minutesToTime(item.total_hours * 60)}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="3" className="border border-gray-300 p-4 text-center text-gray-500">
+                  集計データがありません
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

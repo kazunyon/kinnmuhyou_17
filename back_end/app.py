@@ -249,106 +249,273 @@ def get_holidays(year):
         app.logger.error(f"祝日データ取得エラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+@app.route('/api/clients', methods=['GET'])
+def get_clients():
+    """取引先マスターの全データを取得します。"""
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT * FROM clients ORDER BY client_name')
+        clients = [dict(row) for row in cursor.fetchall()]
+        return jsonify(clients)
+    except Exception as e:
+        app.logger.error(f"取引先データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects', methods=['GET'])
+def get_projects():
+    """案件マスターの全データを取得します。取引先名も結合して返します。"""
+    try:
+        db = get_db()
+        cursor = db.execute("""
+            SELECT p.project_id, p.project_name, p.client_id, c.client_name
+            FROM projects p
+            JOIN clients c ON p.client_id = c.client_id
+            ORDER BY c.client_name, p.project_name
+        """)
+        projects = [dict(row) for row in cursor.fetchall()]
+        return jsonify(projects)
+    except Exception as e:
+        app.logger.error(f"案件データ取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients', methods=['POST'])
+def add_client():
+    """新しい取引先を追加します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+
+    client_name = data.get('client_name')
+    if not client_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute("INSERT INTO clients (client_name) VALUES (?)", (client_name,))
+        db.commit()
+        return jsonify({"message": "取引先を追加しました", "client_id": cursor.lastrowid}), 201
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({"error": "その取引先名は既に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients/<int:client_id>', methods=['PUT'])
+def update_client(client_id):
+    """取引先名を更新します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+
+    new_name = data.get('client_name')
+    if not new_name:
+        return jsonify({"error": "取引先名は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute("UPDATE clients SET client_name = ? WHERE client_id = ?", (new_name, client_id))
+        db.commit()
+        return jsonify({"message": "取引先を更新しました"}), 200
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({"error": "その取引先名は既に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/clients/<int:client_id>', methods=['DELETE'])
+def delete_client(client_id):
+    """取引先を削除します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+
+    try:
+        db = get_db()
+        # 関連する案件がないかチェック
+        cursor = db.execute("SELECT 1 FROM projects WHERE client_id = ?", (client_id,))
+        if cursor.fetchone():
+            return jsonify({"error": "この取引先には案件が紐付いているため削除できません"}), 400
+
+        db.execute("DELETE FROM clients WHERE client_id = ?", (client_id,))
+        db.commit()
+        return jsonify({"message": "取引先を削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"取引先削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects', methods=['POST'])
+def add_project():
+    """新しい案件を追加します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+
+    client_id = data.get('client_id')
+    project_name = data.get('project_name')
+    if not all([client_id, project_name]):
+        return jsonify({"error": "取引先と案件名は必須です"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute("INSERT INTO projects (client_id, project_name) VALUES (?, ?)", (client_id, project_name))
+        db.commit()
+        return jsonify({"message": "案件を追加しました", "project_id": cursor.lastrowid}), 201
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({"error": "その案件名は既にこの取引先に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件追加エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    """案件を更新します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+
+    client_id = data.get('client_id')
+    project_name = data.get('project_name')
+    if not all([client_id, project_name]):
+        return jsonify({"error": "取引先と案件名は必須です"}), 400
+
+    try:
+        db = get_db()
+        db.execute("UPDATE projects SET client_id = ?, project_name = ? WHERE project_id = ?", (client_id, project_name, project_id))
+        db.commit()
+        return jsonify({"message": "案件を更新しました"}), 200
+    except sqlite3.IntegrityError:
+        db.rollback()
+        return jsonify({"error": "その案件名は既にこの取引先に存在します"}), 409
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件更新エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+def delete_project(project_id):
+    """案件を削除します。オーナー認証が必要です。"""
+    data = request.json
+    if not is_valid_owner(data.get('owner_id'), data.get('owner_password')):
+        return jsonify({"error": "権限がありません"}), 403
+    try:
+        db = get_db()
+        # 関連する作業明細がないかチェック (念のため)
+        cursor = db.execute("SELECT 1 FROM work_record_details WHERE project_id = ?", (project_id,))
+        if cursor.fetchone():
+            return jsonify({"error": "この案件には作業記録が紐付いているため削除できません"}), 400
+
+        db.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
+        db.commit()
+        return jsonify({"message": "案件を削除しました"}), 200
+    except Exception as e:
+        db.rollback()
+        app.logger.error(f"案件削除エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
 # -----------------------------------------------------------------------------
 # APIエンドポイント: 作業報告書関連
 # -----------------------------------------------------------------------------
 
 @app.route('/api/work_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_work_records(employee_id, year, month):
-    """指定された社員と年月の作業記録、月次特記事項、および月次集計サマリーを取得します。
-
-    作業報告書画面の表示に必要なデータをまとめて返します。
-    日次記録はDBに存在するレコードのみを返し、フロントエンド側で月の全日分に展開することを想定しています。
-    月次集計は、AttendanceCalculatorを使用してサーバーサイドで計算します。
-    """
+    """作業報告書データを取得。作業明細を含み、月次サマリーと請求先別集計も行います。"""
     try:
         db = get_db()
         calculator = AttendanceCalculator()
-        year_str = str(year)
-        month_str = f"{month:02d}"
+        year_str, month_str = str(year), f"{month:02d}"
 
-        # 1. 該当月の作業記録をDBから取得（計算に必要な全カラムを取得）
-        #    フロントエンドが期待するスパースな（存在する日のみの）リストを生成
+        # 1. 該当月の作業記録(ヘッダー)とそれに関連する明細(ディテール)を取得
         records_cursor = db.execute("""
             SELECT *, CAST(strftime('%d', date) AS INTEGER) as day
             FROM work_records
             WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
         """, (employee_id, year_str, month_str))
-        records_for_display = [dict(row) for row in records_cursor.fetchall()]
 
-        # 2. 月次集計のために、取得したデータを日付をキーとする辞書に変換
+        records_for_display = []
+        for row in records_cursor.fetchall():
+            record = dict(row)
+            details_cursor = db.execute("""
+                SELECT d.detail_id, d.work_time, d.project_id,
+                       p.project_name, p.client_id, c.client_name
+                FROM work_record_details d
+                JOIN projects p ON d.project_id = p.project_id
+                JOIN clients c ON p.client_id = c.client_id
+                WHERE d.record_id = ?
+            """, (record['record_id'],))
+            record['details'] = [dict(detail_row) for detail_row in details_cursor.fetchall()]
+            records_for_display.append(record)
+
+        # 2. 月次集計のために、日付をキーとする辞書に変換
         records_map = {r['day']: r for r in records_for_display}
 
         # 3. 集計計算に必要な祝日データを取得
         holidays_cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (year_str,))
         holidays_set = {row['date'] for row in holidays_cursor.fetchall()}
 
-        # 4. 月の全日をループして、日次サマリーを計算し、月次集計のインプットを作成
+        # 4. 月の全日ループ (月次サマリー計算ロジック)
         _, num_days = calendar.monthrange(year, month)
         all_daily_data_for_summary = []
         for day in range(1, num_days + 1):
             date_str = f"{year:04d}-{month:02d}-{day:02d}"
-            db_record = records_map.get(day, {})  # その日の記録がなければ空の辞書
-
+            db_record = records_map.get(day, {})
             weekday = datetime(year, month, day).weekday()
             is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6]
-
-            # 日次サマリー計算用の入力データを作成
-            calc_input = {
-                'start_time': db_record.get('start_time'),
-                'end_time': db_record.get('end_time'),
-                'break_time': db_record.get('break_time'),
-                'night_break_time': db_record.get('night_break_time'),
-                'holiday_type': db_record.get('holiday_type'),
-                'is_holiday_from_calendar': is_holiday_from_calendar
-            }
+            calc_input = {'start_time': db_record.get('start_time'),'end_time': db_record.get('end_time'),'break_time': db_record.get('break_time'),'night_break_time': db_record.get('night_break_time'),'holiday_type': db_record.get('holiday_type'),'is_holiday_from_calendar': is_holiday_from_calendar}
             daily_summary = calculator.calculate_daily_summary(calc_input)
-
-            # 月次サマリー計算用の入力データを作成
-            summary_input_record = {
-                "attendance_type": db_record.get('attendance_type'),
-                "daily_summary": daily_summary
-            }
-            all_daily_data_for_summary.append(summary_input_record)
+            all_daily_data_for_summary.append({"attendance_type": db_record.get('attendance_type'), "daily_summary": daily_summary})
 
         # 5. 月次サマリーを計算
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data_for_summary)
 
-        # 6. DBに保存された月次レポート情報（特記事項、承認日、手入力の集計項目）を取得
-        report_cursor = db.execute("""
-            SELECT * FROM monthly_reports
-            WHERE employee_id = ? AND year = ? AND month = ?
-        """, (employee_id, year, month))
+        # 6. DB保存の月次レポート情報とマージ
+        report_cursor = db.execute("SELECT * FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?", (employee_id, year, month))
         report_row = report_cursor.fetchone()
-
-        special_notes = ""
-        approval_date = None
-
-        # 手入力の集計項目のデフォルト値
-        manual_summary_fields = {
-            'absent_days': 0, 'paid_holidays': 0, 'compensatory_holidays': 0,
-            'substitute_holidays': 0, 'late_days': 0, 'early_leave_days': 0, 'holiday_work_days': 0
-        }
-
+        special_notes, approval_date = "", None
+        manual_summary_fields = {'absent_days': 0, 'paid_holidays': 0, 'compensatory_holidays': 0, 'substitute_holidays': 0, 'late_days': 0, 'early_leave_days': 0, 'holiday_work_days': 0}
         if report_row:
-            # レポートが存在する場合、DBの値で更新
             special_notes = report_row['special_notes'] or ""
             approval_date = report_row['approval_date']
             for field in manual_summary_fields.keys():
                 if report_row[field] is not None:
                     manual_summary_fields[field] = report_row[field]
-
-        # 計算されたサマリーと手入力のサマリーをマージ
         monthly_summary.update(manual_summary_fields)
 
-        app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records_for_display)}件")
+        # 7. 請求先・案件別の月次工数集計
+        billing_summary_cursor = db.execute("""
+            SELECT
+                c.client_name,
+                p.project_name,
+                SUM(wd.work_time) as total_hours
+            FROM work_record_details wd
+            JOIN work_records wr ON wd.record_id = wr.record_id
+            JOIN projects p ON wd.project_id = p.project_id
+            JOIN clients c ON p.client_id = c.client_id
+            WHERE
+                wr.employee_id = ? AND
+                strftime('%Y', wr.date) = ? AND
+                strftime('%m', wr.date) = ?
+            GROUP BY
+                c.client_name, p.project_name
+            ORDER BY
+                c.client_name, p.project_name
+        """, (employee_id, year_str, month_str))
+        billing_summary = [dict(row) for row in billing_summary_cursor.fetchall()]
+        app.logger.info(f"請求先別集計: {len(billing_summary)}件")
 
-        # 7. 全てのデータをまとめてJSONで返す
+        app.logger.info(f"作業記録取得: 社員ID={employee_id}, 年月={year}-{month}, {len(records_for_display)}件")
         return jsonify({
             "records": records_for_display,
             "special_notes": special_notes,
             "approval_date": approval_date,
-            "monthly_summary": monthly_summary
+            "monthly_summary": monthly_summary,
+            "billing_summary": billing_summary
         })
     except Exception as e:
         app.logger.error(f"作業記録取得エラー: {e}")
@@ -358,136 +525,91 @@ def get_work_records(employee_id, year, month):
 
 @app.route('/api/work_records', methods=['POST'])
 def save_work_records():
-    """作業報告書の日次記録と月次特記事項を保存します（UPSERT処理）。
-
-    UPSERT処理: データが存在しない場合は新規作成（INSERT）、存在する場合は更新（UPDATE）します。
-    この操作は、リクエスト元の`employee_id`がシステムのオーナーIDと一致する場合にのみ許可されます。
-    これにより、オーナーのみが他者の作業報告書を編集できるというセキュリティを担保します。
-
-    Request Body (JSON):
-        {
-            "employee_id": int,
-            "year": int,
-            "month": int,
-            "records": [{"day": int, "start_time": str, ...}, ...],
-            "special_notes": str
-        }
-
-    Returns:
-        Response: 保存成功メッセージを含むJSONレスポンス。
-                  権限がない場合はステータスコード403、
-                  データが無効な場合は400、
-                  サーバーエラーの場合は500を返します。
-    """
+    """作業報告書の日次記録(ヘッダー/ディテール)と月次特記事項を保存します。"""
     data = request.json
-    employee_id = data.get('employee_id')
-    year = data.get('year')
-    month = data.get('month')
-    records = data.get('records')
-    special_notes = data.get('special_notes')
-    monthly_summary = data.get('monthly_summary', {})
+    employee_id, year, month = data.get('employee_id'), data.get('year'), data.get('month')
+    records, special_notes, monthly_summary = data.get('records'), data.get('special_notes'), data.get('monthly_summary', {})
 
     if not all([employee_id, year, month, isinstance(records, list)]):
-        app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
-    # セキュリティチェック: オーナー以外のユーザーからの更新を防ぐ
     owner_id = get_owner_id()
     if employee_id != owner_id:
-        app.logger.warning(f"権限のない作業記録保存試行: 操作対象ID={employee_id}, オーナーID={owner_id}")
         return jsonify({"error": "作業記録を更新する権限がありません。"}), 403
 
     db = get_db()
     try:
-        # 1. 月次レポート（特記事項と月次集計）をUPSERT
-        cursor = db.execute(
-            "SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?",
-            (employee_id, year, month)
-        )
+        # 1. 月次レポートをUPSERT
+        cursor = db.execute("SELECT report_id FROM monthly_reports WHERE employee_id = ? AND year = ? AND month = ?", (employee_id, year, month))
         report_row = cursor.fetchone()
 
-        # UPSERT用のパラメータを準備
         report_params = {
-            "employee_id": employee_id,
-            "year": year,
-            "month": month,
-            "special_notes": special_notes,
-            "absent_days": monthly_summary.get('absent_days'),
-            "paid_holidays": monthly_summary.get('paid_holidays'),
-            "compensatory_holidays": monthly_summary.get('compensatory_holidays'),
-            "substitute_holidays": monthly_summary.get('substitute_holidays'),
-            "late_days": monthly_summary.get('late_days'),
-            "early_leave_days": monthly_summary.get('early_leave_days'),
-            "holiday_work_days": monthly_summary.get('holiday_work_days')
+            "employee_id": employee_id, "year": year, "month": month, "special_notes": special_notes,
+            **{k: monthly_summary.get(k) for k in [
+                'absent_days', 'paid_holidays', 'compensatory_holidays', 'substitute_holidays',
+                'late_days', 'early_leave_days', 'holiday_work_days'
+            ]}
         }
 
         if report_row:
-            # 存在すればUPDATE
-            report_params["report_id"] = report_row['report_id']
             db.execute("""
-                UPDATE monthly_reports SET
-                special_notes = :special_notes, absent_days = :absent_days, paid_holidays = :paid_holidays,
-                compensatory_holidays = :compensatory_holidays, substitute_holidays = :substitute_holidays,
-                late_days = :late_days, early_leave_days = :early_leave_days, holiday_work_days = :holiday_work_days
+                UPDATE monthly_reports SET special_notes = :special_notes, absent_days = :absent_days,
+                paid_holidays = :paid_holidays, compensatory_holidays = :compensatory_holidays,
+                substitute_holidays = :substitute_holidays, late_days = :late_days,
+                early_leave_days = :early_leave_days, holiday_work_days = :holiday_work_days
                 WHERE report_id = :report_id
-            """, report_params)
+            """, {**report_params, "report_id": report_row['report_id']})
         else:
-            # 存在しなければINSERT
             db.execute("""
-                INSERT INTO monthly_reports (
-                    employee_id, year, month, special_notes, absent_days, paid_holidays,
-                    compensatory_holidays, substitute_holidays, late_days, early_leave_days, holiday_work_days
-                ) VALUES (
-                    :employee_id, :year, :month, :special_notes, :absent_days, :paid_holidays,
-                    :compensatory_holidays, :substitute_holidays, :late_days, :early_leave_days, :holiday_work_days
-                )
+                INSERT INTO monthly_reports (employee_id, year, month, special_notes, absent_days,
+                paid_holidays, compensatory_holidays, substitute_holidays, late_days,
+                early_leave_days, holiday_work_days) VALUES (:employee_id, :year, :month,
+                :special_notes, :absent_days, :paid_holidays, :compensatory_holidays,
+                :substitute_holidays, :late_days, :early_leave_days, :holiday_work_days)
             """, report_params)
 
-        # 2. 日次作業記録をループでUPSERT
+        # 2. 日次作業記録(ヘッダーとディテール)をループでUPSERT
         for record in records:
             day = record.get('day')
-            if day is None: continue # 日付がないデータはスキップ
-
+            if day is None: continue
             date_str = f"{year}-{month:02d}-{day:02d}"
             
-            cursor = db.execute(
-                "SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?",
-                (employee_id, date_str)
-            )
+            cursor = db.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date_str))
             record_row = cursor.fetchone()
 
-            if record_row:
-                # 存在すればUPDATE
-                db.execute("""
-                    UPDATE work_records
-                    SET start_time = ?, end_time = ?, break_time = ?, work_content = ?
-                    WHERE record_id = ?
-                """, (
-                    record.get('start_time'), record.get('end_time'),
-                    record.get('break_time'), record.get('work_content'),
-                    record_row['record_id']
-                ))
-            else:
-                # 存在しなければINSERT
-                db.execute("""
-                    INSERT INTO work_records (employee_id, date, start_time, end_time, break_time, work_content)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (
-                    employee_id, date_str, record.get('start_time'), record.get('end_time'),
-                    record.get('break_time'), record.get('work_content')
-                ))
+            header_params = {
+                'employee_id': employee_id, 'date': date_str,
+                'start_time': record.get('start_time'), 'end_time': record.get('end_time'),
+                'break_time': record.get('break_time')
+            }
 
-        db.commit() # 全ての処理が成功したらコミット
+            if record_row:
+                current_record_id = record_row['record_id']
+                db.execute("UPDATE work_records SET start_time = :start_time, end_time = :end_time, break_time = :break_time WHERE record_id = :record_id",
+                           {**header_params, 'record_id': current_record_id})
+            else:
+                cursor = db.execute("INSERT INTO work_records (employee_id, date, start_time, end_time, break_time) VALUES (:employee_id, :date, :start_time, :end_time, :break_time)",
+                                  header_params)
+                current_record_id = cursor.lastrowid
+
+            # 既存の明細を削除してから新しい明細を挿入
+            db.execute("DELETE FROM work_record_details WHERE record_id = ?", (current_record_id,))
+            details = record.get('details', [])
+            if details:
+                detail_params = [
+                    (current_record_id, detail.get('project_id'), detail.get('work_time'))
+                    for detail in details if detail.get('project_id') and detail.get('work_time')
+                ]
+                if detail_params:
+                    db.executemany("INSERT INTO work_record_details (record_id, project_id, work_time) VALUES (?, ?, ?)",
+                                   detail_params)
+        db.commit()
         app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
         return jsonify({"message": "保存しました"}), 200
     except sqlite3.Error as e:
-        db.rollback() # エラーが発生したらロールバック
+        db.rollback()
         app.logger.error(f"作業記録保存エラー (DB): {e}")
         return jsonify({"error": "データベースエラー"}), 500
-    except Exception as e:
-        db.rollback() # エラーが発生したらロールバック
-        app.logger.error(f"作業記録保存エラー: {e}")
-        return jsonify({"error": "サーバー内部エラー"}), 500
 
 @app.route('/api/monthly_reports/approve', methods=['POST'])
 def approve_monthly_report():
@@ -609,86 +731,71 @@ def cancel_approval():
 
 @app.route('/api/attendance_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 def get_attendance_records(employee_id, year, month):
-    """指定された社員と年月の勤怠データを、日次・月次集計と共に取得します。
-
-    勤怠管理表画面の表示に必要な全ての計算済みデータを返します。
-    DBから作業記録と祝日を取得し、外部モジュール`AttendanceCalculator`を
-    使用して各日の勤怠サマリーと月次サマリーを計算します。
-
-    Args:
-        employee_id (int): 社員ID。
-        year (int): 対象年。
-        month (int): 対象月。
-
-    Returns:
-        Response: 日次記録のリストと月次集計を含むJSONレスポンス。
-                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
-    """
+    """勤怠管理表データを取得。備考欄に作業明細と日報を結合します。"""
     try:
         db = get_db()
         calculator = AttendanceCalculator()
+        year_str, month_str = f"{year:04d}", f"{month:02d}"
 
-        # 該当月の作業記録をDBから取得し、日付(day)をキーにした辞書に変換
-        cursor = db.execute("""
-            SELECT * FROM work_records
-            WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
-        """, (employee_id, f"{year:04d}", f"{month:02d}"))
-        records_map = {int(row['date'].split('-')[2]): dict(row) for row in cursor.fetchall()}
+        # 1. 必要なデータを並行して取得
+        records_cursor = db.execute("SELECT * FROM work_records WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?", (employee_id, year_str, month_str))
+        records_map = {row['date']: dict(row) for row in records_cursor.fetchall()}
 
-        # 該当年の祝日をDBから取得し、高速アクセスのためにセットに変換
-        cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (f"{year:04d}",))
-        holidays_set = {row['date'] for row in cursor.fetchall()}
+        details_cursor = db.execute("""
+            SELECT wr.date, c.client_name, p.project_name, wd.work_time
+            FROM work_record_details wd
+            JOIN work_records wr ON wd.record_id = wr.record_id
+            JOIN projects p ON wd.project_id = p.project_id
+            JOIN clients c ON p.client_id = c.client_id
+            WHERE wr.employee_id = ? AND strftime('%Y', wr.date) = ? AND strftime('%m', wr.date) = ?
+        """, (employee_id, year_str, month_str))
+        details_map = {}
+        for row in details_cursor.fetchall():
+            details_map.setdefault(row['date'], []).append(f"{row['client_name']} - {row['project_name']} ({row['work_time']})")
 
-        # 月の日数を取得
+        reports_cursor = db.execute("SELECT date, work_summary FROM daily_reports WHERE employee_id = ? AND strftime('%Y', date) = ? AND strftime('%m', date) = ?", (employee_id, year_str, month_str))
+        reports_map = {row['date']: row['work_summary'] for row in reports_cursor.fetchall()}
+
+        holidays_cursor = db.execute("SELECT date FROM holidays WHERE strftime('%Y', date) = ?", (year_str,))
+        holidays_set = {row['date'] for row in holidays_cursor.fetchall()}
+
+        # 2. 月の全日分のデータを生成
         _, num_days = calendar.monthrange(year, month)
         all_daily_data = []
-
-        # 1日から末日までループし、各日の勤怠データを生成
         for day in range(1, num_days + 1):
-            date_str = f"{year:04d}-{month:02d}-{day:02d}"
-            db_record = records_map.get(day, {}) # DBに記録がなければ空の辞書を使用
+            date_str = f"{year_str}-{month_str}-{day:02d}"
+            db_record = records_map.get(date_str, {})
 
-            # 曜日と、カレンダー上の休日（土日または祝日）かを判定
+            remarks_parts = []
+            if date_str in details_map:
+                remarks_parts.append("[作業明細] " + " / ".join(details_map[date_str]))
+
+            if date_str in reports_map and reports_map[date_str]:
+                remarks_parts.append("[日報] " + reports_map[date_str])
+
+            remarks = " ".join(remarks_parts)
+
             weekday = datetime(year, month, day).weekday()
             is_holiday_from_calendar = date_str in holidays_set or weekday in [5, 6]
-
-            # 勤怠計算モジュールへの入力データを作成
-            calc_input = {
-                'start_time': db_record.get('start_time'),
-                'end_time': db_record.get('end_time'),
-                'break_time': db_record.get('break_time'),
-                'night_break_time': db_record.get('night_break_time'),
-                'holiday_type': db_record.get('holiday_type'), # 例: 半休など
-                'is_holiday_from_calendar': is_holiday_from_calendar
-            }
-            # 日次サマリーを計算
+            calc_input = {k: db_record.get(k) for k in ['start_time', 'end_time', 'break_time', 'night_break_time', 'holiday_type']}
+            calc_input['is_holiday_from_calendar'] = is_holiday_from_calendar
             daily_summary = calculator.calculate_daily_summary(calc_input)
 
-            # フロントエンドに返す日次データを構築
+            # daily_data の remarks を更新
             daily_data = {
+                **{k: db_record.get(k) for k in ['holiday_type', 'attendance_type', 'start_time', 'end_time', 'break_time', 'night_break_time']},
                 "day": day,
                 "date": date_str,
                 "weekday": weekday,
-                "holiday_type": db_record.get('holiday_type'),
-                "attendance_type": db_record.get('attendance_type'),
-                "start_time": db_record.get('start_time'),
-                "end_time": db_record.get('end_time'),
-                "break_time": db_record.get('break_time'),
-                "night_break_time": db_record.get('night_break_time'),
-                "remarks": db_record.get('work_content'), # 備考欄には作業内容を表示
-                "daily_summary": daily_summary # 計算結果
+                "remarks": remarks,
+                "daily_summary": daily_summary
             }
             all_daily_data.append(daily_data)
 
-        # 全ての日次データから月次サマリーを計算
-        monthly_summary = calculator.calculate_monthly_summary(all_daily_data)
+        monthly_summary = calculator.calculate_monthly_summary([{"daily_summary": r['daily_summary'], "attendance_type": r.get('attendance_type')} for r in all_daily_data])
 
         app.logger.info(f"勤怠データ取得成功: 社員ID={employee_id}, 年月={year}-{month}")
-        return jsonify({
-            "daily_records": all_daily_data,
-            "monthly_summary": monthly_summary
-        })
-
+        return jsonify({"daily_records": all_daily_data, "monthly_summary": monthly_summary})
     except Exception as e:
         app.logger.error(f"勤怠データ取得エラー: {e}")
         import traceback
@@ -763,7 +870,6 @@ def save_attendance_records():
                 'end_time': end_time,
                 'break_time': break_time,
                 'night_break_time': night_break_time,
-                'work_content': record.get('remarks')
             }
 
             if record_row:
@@ -772,8 +878,7 @@ def save_attendance_records():
                 db.execute("""
                     UPDATE work_records SET
                     holiday_type=:holiday_type, attendance_type=:attendance_type, start_time=:start_time,
-                    end_time=:end_time, break_time=:break_time, night_break_time=:night_break_time,
-                    work_content=:work_content
+                    end_time=:end_time, break_time=:break_time, night_break_time=:night_break_time
                     WHERE record_id=:record_id
                 """, params)
             else:
@@ -781,10 +886,10 @@ def save_attendance_records():
                 db.execute("""
                     INSERT INTO work_records (
                         employee_id, date, holiday_type, attendance_type, start_time,
-                        end_time, break_time, night_break_time, work_content
+                        end_time, break_time, night_break_time
                     ) VALUES (
                         :employee_id, :date, :holiday_type, :attendance_type, :start_time,
-                        :end_time, :break_time, :night_break_time, :work_content
+                        :end_time, :break_time, :night_break_time
                     )
                 """, params)
 
@@ -896,30 +1001,6 @@ def save_daily_report():
                 data.get('challenges'), data.get('tomorrow_tasks'), data.get('thoughts')
             ))
         
-        # 2. work_recordsテーブルも更新
-        # 日報の入力はwork_recordsのデータソースでもあるため、こちらにも反映させる
-        work_summary = data.get('work_summary')
-        start_time = data.get('start_time')
-        end_time = data.get('end_time')
-        break_time = data.get('break_time')
-
-        cursor.execute("SELECT record_id FROM work_records WHERE employee_id = ? AND date = ?", (employee_id, date))
-        record_row = cursor.fetchone()
-
-        if record_row:
-            # 存在すればUPDATE
-            # 日報で入力された勤務時間も更新する
-            cursor.execute(
-                "UPDATE work_records SET work_content = ?, start_time = ?, end_time = ?, break_time = ? WHERE record_id = ?",
-                (work_summary, start_time, end_time, break_time, record_row['record_id'])
-            )
-        else:
-            # 存在しなければINSERT
-            # 日報で初めてその日のデータが入力される場合、work_recordsにもレコードを作成する
-            cursor.execute(
-                "INSERT INTO work_records (employee_id, date, work_content, start_time, end_time, break_time) VALUES (?, ?, ?, ?, ?, ?)",
-                (employee_id, date, work_summary, start_time, end_time, break_time)
-            )
 
         db.commit()
         app.logger.info(f"日報データ保存成功 (work_recordsも更新): 社員ID={employee_id}, 日付={date}")
