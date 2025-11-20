@@ -482,6 +482,7 @@ function App() {
           holidays={holidays}
           specialNotes={specialNotes}
           monthlySummary={monthlySummary}
+          projectSummary={projectSummary} // 追加
           approvalDate={approvalDate}
         />
       </div>
