@@ -702,28 +702,8 @@ def save_work_records():
                         """, (record_id, client_id, project_id, work_time))
 
                 # 4. work_content の自動生成と更新
-                # 保存した明細を読み込み直して文字列生成
-                details_cursor = db.execute("""
-                    SELECT p.project_name, d.work_time
-                    FROM work_record_details d
-                    JOIN projects p ON d.project_id = p.project_id
-                    WHERE d.record_id = ?
-                    ORDER BY d.detail_id
-                """, (record_id,))
-                saved_details = details_cursor.fetchall()
-
-                if saved_details:
-                    content_lines = []
-                    for sd in saved_details:
-                        # 分を時間に変換 (例: 4h, 4.5h)
-                        hours = sd['work_time'] / 60
-                        # 整数の場合は .0 を消す
-                        hours_str = f"{int(hours)}" if hours.is_integer() else f"{hours}"
-                        content_lines.append(f"・{sd['project_name']}({hours_str}h)")
-                    new_work_content = "\n".join(content_lines)
-
-                    # work_recordsを更新
-                    db.execute("UPDATE work_records SET work_content = ? WHERE record_id = ?", (new_work_content, record_id))
+                # 手動入力された内容を優先するため、自動生成ロジックは削除しました。
+                pass
 
         db.commit() # 全ての処理が成功したらコミット
         app.logger.info(f"作業記録保存成功: 社員ID={employee_id}, 年月={year}-{month}")
@@ -1192,40 +1172,10 @@ def save_daily_report():
                         VALUES (?, ?, ?, ?)
                     """, (record_id, client_id, project_id, work_time))
 
-            # 4. work_content の自動生成と更新 (明細がある場合、work_summaryは上書きされる)
-            # 保存した明細を読み込み直して文字列生成
-            cursor.execute("""
-                SELECT p.project_name, d.work_time
-                FROM work_record_details d
-                JOIN projects p ON d.project_id = p.project_id
-                WHERE d.record_id = ?
-                ORDER BY d.detail_id
-            """, (record_id,))
-            saved_details = cursor.fetchall()
-
-            if saved_details:
-                content_lines = []
-                for sd in saved_details:
-                    # 分を時間に変換
-                    hours = sd['work_time'] / 60
-                    hours_str = f"{int(hours)}" if hours.is_integer() else f"{hours}"
-                    content_lines.append(f"・{sd['project_name']}({hours_str}h)")
-                new_work_content = "\n".join(content_lines)
-
-                # work_recordsを更新 (daily_reportsのwork_summaryも更新すべきか？)
-                # 要件では「従来のwork_contentは...月次画面上では簡易表示に留めます」
-                # work_recordsは月次画面用なので更新する。
-                # daily_reportsは日報そのものなので、ユーザーが入力したテキストを残すか、同期するか。
-                # ここでは、ユーザーがテキストエリアに入力した内容(data['work_summary'])を優先し、
-                # 明細から生成されたテキストは work_records にのみ反映する形にするか、
-                # あるいは daily_reports にも反映するか。
-                # 日報モーダルでは「明細」と「作業内容テキストエリア」が共存するUIになるか、
-                # テキストエリアが明細から自動生成されるReadonlyになるか。
-                # 要件「従来のwork_content（作業内容テキスト）は...複数明細導入後は、各明細の組み合わせが作業内容となるため...」
-                # とあるので、自動生成が正。したがってdaily_reports側も更新しておくのが親切。
-
-                cursor.execute("UPDATE work_records SET work_content = ? WHERE record_id = ?", (new_work_content, record_id))
-                cursor.execute("UPDATE daily_reports SET work_summary = ? WHERE report_id = (SELECT report_id FROM daily_reports WHERE employee_id = ? AND date = ?)", (new_work_content, employee_id, date))
+            # 4. work_content の自動生成と更新
+            # 以前はここで明細からwork_contentを自動生成して上書きしていましたが、
+            # 手動入力された内容を優先するため、自動生成ロジックは削除しました。
+            pass
 
 
         db.commit()
