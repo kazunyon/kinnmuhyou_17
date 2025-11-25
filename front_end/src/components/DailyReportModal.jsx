@@ -48,13 +48,15 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [totalDetailTime, setTotalDetailTime] = useState(0);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
 
   useEffect(() => {
     const fetchMasters = async () => {
       try {
+        const params = { include_deleted: includeDeleted };
         const [clientsRes, projectsRes] = await Promise.all([
-          axios.get(`${API_URL}/clients`),
-          axios.get(`${API_URL}/projects`)
+          axios.get(`${API_URL}/clients`, { params }),
+          axios.get(`${API_URL}/projects`, { params })
         ]);
         setClients(clientsRes.data);
         setProjects(projectsRes.data);
@@ -63,7 +65,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       }
     };
     if (isOpen) fetchMasters();
-  }, [isOpen]);
+  }, [isOpen, includeDeleted]);
 
   useEffect(() => {
     if (isOpen && workRecord) {
@@ -327,7 +329,17 @@ ${reportData.thoughts}`;
           {/* 作業明細入力 */}
           <div className="p-4 border rounded w-full mt-4 bg-blue-50">
             <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold">作業内訳 (ディテール)</h3>
+                <div className="flex items-center space-x-4">
+                    <h3 className="font-bold">作業内訳 (ディテール)</h3>
+                    <label className="flex items-center space-x-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={includeDeleted}
+                            onChange={(e) => setIncludeDeleted(e.target.checked)}
+                        />
+                        <span>削除済みを表示</span>
+                    </label>
+                </div>
                 <button onClick={handleAddDetail} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">+ 行追加</button>
             </div>
             <table className="w-full bg-white border">
@@ -345,14 +357,14 @@ ${reportData.thoughts}`;
                             <td className="p-2 border">
                                 <select className="w-full p-1 border rounded" value={detail.client_id} onChange={(e) => handleDetailChange(index, 'client_id', parseInt(e.target.value))}>
                                     <option value="">選択...</option>
-                                    {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+                                    {clients.map(c => <option key={c.client_id} value={c.client_id} className={c.deleted ? 'text-red-500' : ''}>{c.client_name}</option>)}
                                 </select>
                             </td>
                             <td className="p-2 border">
                                 <select className="w-full p-1 border rounded" value={detail.project_id} onChange={(e) => handleDetailChange(index, 'project_id', parseInt(e.target.value))} disabled={!detail.client_id}>
                                     <option value="">選択...</option>
                                     {projects.filter(p => p.client_id === detail.client_id).map(p => (
-                                        <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                                        <option key={p.project_id} value={p.project_id} className={p.deleted ? 'text-red-500' : ''}>{p.project_name}</option>
                                     ))}
                                 </select>
                             </td>
