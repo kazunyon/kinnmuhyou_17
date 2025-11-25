@@ -38,7 +38,8 @@ CREATE TABLE holidays (
 -- 取引先マスター
 CREATE TABLE clients (
     client_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    client_name TEXT NOT NULL
+    client_name TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0 -- 0:有効, 1:削除済み
 );
 
 -- 案件マスター
@@ -46,6 +47,7 @@ CREATE TABLE projects (
     project_id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER NOT NULL,
     project_name TEXT NOT NULL,
+    deleted INTEGER NOT NULL DEFAULT 0, -- 0:有効, 1:削除済み
     FOREIGN KEY (client_id) REFERENCES clients (client_id)
 );
 

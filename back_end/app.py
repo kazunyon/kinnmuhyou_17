@@ -256,9 +256,13 @@ def get_holidays(year):
 @app.route('/api/clients', methods=['GET'])
 def get_clients():
     """取引先リストを取得します。"""
+    include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
-        cursor = db.execute('SELECT * FROM clients ORDER BY client_id')
+        if include_deleted:
+            cursor = db.execute('SELECT * FROM clients ORDER BY client_id')
+        else:
+            cursor = db.execute('SELECT * FROM clients WHERE deleted = 0 ORDER BY client_id')
         clients = [dict(row) for row in cursor.fetchall()]
         return jsonify(clients)
     except Exception as e:
@@ -303,15 +307,15 @@ def update_client(client_id):
 
 @app.route('/api/clients/<int:client_id>', methods=['DELETE'])
 def delete_client(client_id):
-    """取引先を削除します。"""
+    """取引先を削除（論理削除）します。"""
     try:
         db = get_db()
-        # 関連する案件があるか確認
-        cursor = db.execute('SELECT count(*) as count FROM projects WHERE client_id = ?', (client_id,))
-        if cursor.fetchone()['count'] > 0:
-            return jsonify({"error": "この取引先に紐づく案件が存在するため削除できません"}), 400
+        # 関連する案件があるか確認（論理削除では不要になる可能性がある）
+        # cursor = db.execute('SELECT count(*) as count FROM projects WHERE client_id = ?', (client_id,))
+        # if cursor.fetchone()['count'] > 0:
+        #     return jsonify({"error": "この取引先に紐づく案件が存在するため削除できません"}), 400
 
-        db.execute('DELETE FROM clients WHERE client_id = ?', (client_id,))
+        db.execute('UPDATE clients SET deleted = 1 WHERE client_id = ?', (client_id,))
         db.commit()
         return jsonify({"message": "削除しました"}), 200
     except Exception as e:
@@ -322,15 +326,21 @@ def delete_client(client_id):
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
     """案件リストを取得します。"""
+    include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
-        # クライアント名も結合して取得
-        cursor = db.execute('''
+
+        query = '''
             SELECT p.*, c.client_name
             FROM projects p
             JOIN clients c ON p.client_id = c.client_id
-            ORDER BY p.project_id
-        ''')
+        '''
+        if not include_deleted:
+            query += ' WHERE p.deleted = 0 AND c.deleted = 0'
+
+        query += ' ORDER BY p.project_id'
+
+        cursor = db.execute(query)
         projects = [dict(row) for row in cursor.fetchall()]
         return jsonify(projects)
     except Exception as e:
@@ -377,18 +387,18 @@ def update_project(project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 def delete_project(project_id):
-    """案件を削除します。"""
+    """案件を削除（論理削除）します。"""
     try:
         db = get_db()
-        # 関連する作業明細があるか確認 (まだテーブルがない場合はエラーになるので注意)
-        try:
-            cursor = db.execute('SELECT count(*) as count FROM work_record_details WHERE project_id = ?', (project_id,))
-            if cursor.fetchone()['count'] > 0:
-                return jsonify({"error": "この案件の使用実績があるため削除できません"}), 400
-        except sqlite3.OperationalError:
-            pass # テーブルがない初期段階は無視
+        # 関連する作業明細があるか確認 (論理削除では不要になる可能性がある)
+        # try:
+        #     cursor = db.execute('SELECT count(*) as count FROM work_record_details WHERE project_id = ?', (project_id,))
+        #     if cursor.fetchone()['count'] > 0:
+        #         return jsonify({"error": "この案件の使用実績があるため削除できません"}), 400
+        # except sqlite3.OperationalError:
+        #     pass # テーブルがない初期段階は無視
 
-        db.execute('DELETE FROM projects WHERE project_id = ?', (project_id,))
+        db.execute('UPDATE projects SET deleted = 1 WHERE project_id = ?', (project_id,))
         db.commit()
         return jsonify({"message": "削除しました"}), 200
     except Exception as e:
