@@ -37,43 +37,81 @@ Modal.setAppElement('#root');
  * @returns {JSX.Element} レンダリングされたマスターメンテナンスモーダル。
  */
 const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, ownerId, ownerName }) => {
-  /** @type {[Array<object>, Function]} 全社員リストの状態管理 */
+  // --- 状態管理 ---
+  const [activeTab, setActiveTab] = useState('employees'); // 'employees', 'clients', 'projects'
+
+  // 社員用
   const [employees, setEmployees] = useState([]);
-  /** @type {[object, Function]} 新規追加社員の入力データの状態管理 */
   const [newEmployee, setNewEmployee] = useState({
       company_id: companies.length > 0 ? companies[0].company_id : '',
       employee_name: '', department_name: '', employee_type: '正社員'
   });
-  /** @type {[string, Function]} パスワード入力フィールドの状態管理 */
   const [passwordInput, setPasswordInput] = useState('');
 
+  // 取引先用
+  const [clients, setClients] = useState([]);
+  const [newClientName, setNewClientName] = useState('');
+
+  // 案件用
+  const [projects, setProjects] = useState([]);
+  const [newProject, setNewProject] = useState({ client_id: '', project_name: '' });
+
+  // --- データフェッチング ---
+  const fetchEmployees = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/employees/all`);
+      setEmployees(res.data);
+    } catch (error) {
+      console.error("社員データの取得に失敗しました:", error);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/clients`);
+      setClients(res.data);
+      // 新規案件のデフォルトクライアントID設定
+      if (res.data.length > 0 && !newProject.client_id) {
+        setNewProject(prev => ({ ...prev, client_id: res.data[0].client_id }));
+      }
+    } catch (error) {
+      console.error("取引先データの取得に失敗しました:", error);
+    }
+  };
+
+  const fetchProjects = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/projects`);
+      setProjects(res.data);
+    } catch (error) {
+      console.error("案件データの取得に失敗しました:", error);
+    }
+  };
+
   /**
-   * モーダルが開いたときに社員データをフェッチし、閉じたときに状態をクリーンアップします。
+   * モーダルが開いたときにデータをフェッチし、閉じたときに状態をクリーンアップします。
    */
   useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const employeesRes = await axios.get(`${API_URL}/employees/all`);
-        setEmployees(employeesRes.data);
-      } catch (error) {
-        console.error("社員データの取得に失敗しました:", error);
-        alert('全社員データの取得に失敗しました。');
-      }
-    };
-
     if (isOpen) {
-      fetchEmployees();
+      if (activeTab === 'employees') fetchEmployees();
+      if (activeTab === 'clients') fetchClients();
+      if (activeTab === 'projects') { fetchClients(); fetchProjects(); }
     } else {
-      // モーダルが閉じるときに状態をリセット
+      // リセット
       setPasswordInput('');
       setEmployees([]);
+      setClients([]);
+      setProjects([]);
+      setNewClientName('');
       setNewEmployee({
         company_id: companies.length > 0 ? companies[0].company_id : '',
         employee_name: '', department_name: '', employee_type: '正社員'
       });
     }
-  }, [isOpen, companies]);
+  }, [isOpen, activeTab, companies]);
 
+
+  // --- イベントハンドラ: 社員 ---
   /**
    * 社員リストの入力フィールドの変更をハンドリングします。
    * @param {number} id - 対象の社員ID。
@@ -194,89 +232,281 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     }
   };
 
+  // --- イベントハンドラ: 取引先 ---
+  const handleClientUpdate = async (client) => {
+    if (!client.client_name) return alert("取引先名は必須です");
+    try {
+      await axios.put(`${API_URL}/clients/${client.client_id}`, { client_name: client.client_name });
+      alert("取引先を更新しました");
+      fetchClients();
+    } catch (error) {
+      console.error("更新エラー:", error);
+      alert("更新に失敗しました");
+    }
+  };
+
+  const handleClientDelete = async (clientId) => {
+    if (!window.confirm("本当に削除しますか？")) return;
+    try {
+      await axios.delete(`${API_URL}/clients/${clientId}`);
+      alert("取引先を削除しました");
+      fetchClients();
+    } catch (error) {
+      console.error("削除エラー:", error);
+      alert(error.response?.data?.error || "削除に失敗しました");
+    }
+  };
+
+  const handleClientAdd = async () => {
+    if (!newClientName) return alert("取引先名は必須です");
+    try {
+      await axios.post(`${API_URL}/clients`, { client_name: newClientName });
+      alert("取引先を追加しました");
+      setNewClientName("");
+      fetchClients();
+    } catch (error) {
+      console.error("追加エラー:", error);
+      alert("追加に失敗しました");
+    }
+  };
+
+  // --- イベントハンドラ: 案件 ---
+  const handleProjectUpdate = async (project) => {
+    if (!project.project_name || !project.client_id) return alert("必須項目が不足しています");
+    try {
+      await axios.put(`${API_URL}/projects/${project.project_id}`, {
+        client_id: project.client_id,
+        project_name: project.project_name
+      });
+      alert("案件を更新しました");
+      fetchProjects();
+    } catch (error) {
+      console.error("更新エラー:", error);
+      alert("更新に失敗しました");
+    }
+  };
+
+  const handleProjectDelete = async (projectId) => {
+    if (!window.confirm("本当に削除しますか？")) return;
+    try {
+      await axios.delete(`${API_URL}/projects/${projectId}`);
+      alert("案件を削除しました");
+      fetchProjects();
+    } catch (error) {
+      console.error("削除エラー:", error);
+      alert(error.response?.data?.error || "削除に失敗しました");
+    }
+  };
+
+  const handleProjectAdd = async () => {
+    if (!newProject.project_name || !newProject.client_id) return alert("必須項目が不足しています");
+    try {
+      await axios.post(`${API_URL}/projects`, newProject);
+      alert("案件を追加しました");
+      setNewProject(prev => ({ ...prev, project_name: "" })); // client_idはそのまま
+      fetchProjects();
+    } catch (error) {
+      console.error("追加エラー:", error);
+      alert("追加に失敗しました");
+    }
+  };
+
+
   return (
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="マスターメンテナンス">
       <h2 className="text-xl font-bold text-center mb-6">マスターメンテナンス</h2>
 
-      {/* --- オーナー情報 & 認証エリア --- */}
-      <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
-          <h3 className="text-lg font-semibold mb-3">オーナー情報</h3>
-          <div className="flex items-center space-x-4">
-            <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
-                <span className="font-semibold">ID :</span>
-                <input type="text" value={ownerId || ''} disabled className="p-2 border rounded w-20 bg-gray-200" />
-                <span className="font-semibold">オーナー氏名:</span>
-                <input type="text" value={ownerName || ''} disabled className="p-2 border rounded w-48 bg-gray-200" />
-            </fieldset>
-            <span className="font-semibold">パスワード:</span>
-            <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
-            <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">認証</button>
-          </div>
+      {/* --- タブ切り替え --- */}
+      <div className="flex space-x-4 mb-6 border-b">
+        <button
+          className={`py-2 px-4 ${activeTab === 'employees' ? 'border-b-2 border-blue-500 font-bold' : ''}`}
+          onClick={() => setActiveTab('employees')}>
+          社員マスタ
+        </button>
+        <button
+          className={`py-2 px-4 ${activeTab === 'clients' ? 'border-b-2 border-blue-500 font-bold' : ''}`}
+          onClick={() => setActiveTab('clients')}>
+          取引先マスタ
+        </button>
+        <button
+          className={`py-2 px-4 ${activeTab === 'projects' ? 'border-b-2 border-blue-500 font-bold' : ''}`}
+          onClick={() => setActiveTab('projects')}>
+          案件マスタ
+        </button>
       </div>
 
-      {/* --- 社員情報エリア --- */}
-      <div className={!auth.isAuthenticated ? 'opacity-50 pointer-events-none' : ''}>
+      {activeTab === 'employees' && (
+        <>
+        {/* --- オーナー情報 & 認証エリア (社員タブのみ) --- */}
+        <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
+            <h3 className="text-lg font-semibold mb-3">オーナー情報</h3>
+            <div className="flex items-center space-x-4">
+                <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
+                    <span className="font-semibold">ID :</span>
+                    <input type="text" value={ownerId || ''} disabled className="p-2 border rounded w-20 bg-gray-200" />
+                    <span className="font-semibold">オーナー氏名:</span>
+                    <input type="text" value={ownerName || ''} disabled className="p-2 border rounded w-48 bg-gray-200" />
+                </fieldset>
+                <span className="font-semibold">パスワード:</span>
+                <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
+                <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">認証</button>
+            </div>
+        </div>
+
+        {/* --- 社員情報エリア --- */}
+        <div className={!auth.isAuthenticated ? 'opacity-50 pointer-events-none' : ''}>
+            <div className="overflow-y-auto" style={{maxHeight: '50vh'}}>
+            <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-200 sticky top-0">
+                <tr>
+                    <th className="p-2 border">社員ID</th><th className="p-2 border">企業名</th>
+                    <th className="p-2 border">部署名</th><th className="p-2 border">氏名</th>
+                    <th className="p-2 border">社員区分</th><th className="p-2 border">退職</th>
+                    <th className="p-2 border">参照</th>
+                    <th className="p-2 border">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {employees.map(emp => {
+                    const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
+
+                    // 更新権限のロジック
+                    const canUpdate = auth.isOwner && emp.employee_id === ownerId;
+
+                    return (
+                    <tr key={emp.employee_id}
+                        className={`hover:bg-gray-50 cursor-pointer ${!canUpdate ? 'bg-gray-100' : ''} ${selectedEmployeeId === emp.employee_id ? 'bg-blue-100' : ''}`}
+                        onClick={() => onSelectEmployee(emp.employee_id)}>
+                        <td className="p-2 border">{emp.employee_id}</td>
+                        <td className="p-2 border">{companyName}</td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}>
+                        <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate}>
+                                <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
+                        </select>
+                        </td>
+                        <td className="p-2 border text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" disabled={!canUpdate} /></td>
+                        <td className="p-2 border text-center font-semibold text-teal-600">
+                        {selectedEmployeeId === emp.employee_id ? '参照' : ''}
+                        </td>
+                        <td className="p-2 border text-center"><button onClick={(e) => { e.stopPropagation(); handleUpdate(emp); }} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button></td>
+                    </tr>
+                    )
+                })}
+                {/* 新規社員の追加フォーム */}
+                <tr className="bg-green-50">
+                    <td className="p-2 border">新規</td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
+                        {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
+                        </select>
+                    </td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" disabled={!auth.isOwner} /></td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" disabled={!auth.isOwner} /></td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
+                            <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
+                        </select>
+                    </td>
+                    <td className="p-2 border" colSpan="2"></td>
+                    <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600" disabled={!auth.isOwner}>追加</button></td>
+                </tr>
+                </tbody>
+            </table>
+            </div>
+        </div>
+        </>
+      )}
+
+      {activeTab === 'clients' && (
         <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
+          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
+            <span className="font-bold">新規追加:</span>
+            <input type="text" placeholder="取引先名" className="p-1 border rounded flex-grow" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
+            <button onClick={handleClientAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
+          </div>
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-200 sticky top-0">
               <tr>
-                <th className="p-2 border">社員ID</th><th className="p-2 border">企業名</th>
-                <th className="p-2 border">部署名</th><th className="p-2 border">氏名</th>
-                <th className="p-2 border">社員区分</th><th className="p-2 border">退職</th>
-                <th className="p-2 border">参照</th>
-                <th className="p-2 border">操作</th>
+                <th className="p-2 border w-20">ID</th>
+                <th className="p-2 border">取引先名</th>
+                <th className="p-2 border w-32">操作</th>
               </tr>
             </thead>
             <tbody>
-              {employees.map(emp => {
-                const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
-
-                // 更新権限のロジック
-                const canUpdate = auth.isOwner && emp.employee_id === ownerId;
-
-                return (
-                  <tr key={emp.employee_id}
-                      className={`hover:bg-gray-50 cursor-pointer ${!canUpdate ? 'bg-gray-100' : ''} ${selectedEmployeeId === emp.employee_id ? 'bg-blue-100' : ''}`}
-                      onClick={() => onSelectEmployee(emp.employee_id)}>
-                    <td className="p-2 border">{emp.employee_id}</td>
-                    <td className="p-2 border">{companyName}</td>
-                    <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
-                    <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
-                    <td className="p-2 border" onClick={(e) => e.stopPropagation()}>
-                       <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate}>
-                            <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
-                       </select>
-                    </td>
-                    <td className="p-2 border text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" disabled={!canUpdate} /></td>
-                    <td className="p-2 border text-center font-semibold text-teal-600">
-                      {selectedEmployeeId === emp.employee_id ? '参照' : ''}
-                    </td>
-                    <td className="p-2 border text-center"><button onClick={(e) => { e.stopPropagation(); handleUpdate(emp); }} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button></td>
-                  </tr>
-                )
-              })}
-              {/* 新規社員の追加フォーム */}
-              <tr className="bg-green-50">
-                  <td className="p-2 border">新規</td>
+              {clients.map(client => (
+                <tr key={client.client_id} className="hover:bg-gray-50">
+                  <td className="p-2 border text-center">{client.client_id}</td>
                   <td className="p-2 border">
-                    <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
-                      {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
-                    </select>
+                    <input type="text" className="w-full p-1 border rounded" value={client.client_name}
+                      onChange={(e) => {
+                        const updated = clients.map(c => c.client_id === client.client_id ? { ...c, client_name: e.target.value } : c);
+                        setClients(updated);
+                      }}
+                    />
                   </td>
-                  <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" disabled={!auth.isOwner} /></td>
-                  <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" disabled={!auth.isOwner} /></td>
-                  <td className="p-2 border">
-                     <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
-                          <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
-                     </select>
+                  <td className="p-2 border text-center space-x-2">
+                    <button onClick={() => handleClientUpdate(client)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600">更新</button>
+                    <button onClick={() => handleClientDelete(client.client_id)} className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600">削除</button>
                   </td>
-                  <td className="p-2 border" colSpan="2"></td>
-                  <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600" disabled={!auth.isOwner}>追加</button></td>
-              </tr>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'projects' && (
+        <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
+          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
+            <span className="font-bold">新規追加:</span>
+            <select className="p-1 border rounded" value={newProject.client_id} onChange={(e) => setNewProject(prev => ({ ...prev, client_id: parseInt(e.target.value) }))}>
+              {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+            </select>
+            <input type="text" placeholder="案件名" className="p-1 border rounded flex-grow" value={newProject.project_name} onChange={(e) => setNewProject(prev => ({ ...prev, project_name: e.target.value }))} />
+            <button onClick={handleProjectAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
+          </div>
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-200 sticky top-0">
+              <tr>
+                <th className="p-2 border w-20">ID</th>
+                <th className="p-2 border w-48">取引先</th>
+                <th className="p-2 border">案件名</th>
+                <th className="p-2 border w-32">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map(project => (
+                <tr key={project.project_id} className="hover:bg-gray-50">
+                  <td className="p-2 border text-center">{project.project_id}</td>
+                  <td className="p-2 border">
+                    <select className="w-full p-1 border rounded" value={project.client_id}
+                       onChange={(e) => {
+                         const updated = projects.map(p => p.project_id === project.project_id ? { ...p, client_id: parseInt(e.target.value) } : p);
+                         setProjects(updated);
+                       }}>
+                      {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+                    </select>
+                  </td>
+                  <td className="p-2 border">
+                    <input type="text" className="w-full p-1 border rounded" value={project.project_name}
+                       onChange={(e) => {
+                         const updated = projects.map(p => p.project_id === project.project_id ? { ...p, project_name: e.target.value } : p);
+                         setProjects(updated);
+                       }}
+                    />
+                  </td>
+                  <td className="p-2 border text-center space-x-2">
+                    <button onClick={() => handleProjectUpdate(project)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600">更新</button>
+                    <button onClick={() => handleProjectDelete(project.project_id)} className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600">削除</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="flex justify-end mt-6">
         <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>

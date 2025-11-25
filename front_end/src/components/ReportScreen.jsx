@@ -41,6 +41,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
+  projectSummary, // 追加
   approvalDate,
   isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
@@ -168,6 +169,35 @@ const ReportScreen = ({
         />
       )}
       
+      {/* 請求先・案件別集計表 */}
+      <div className="mt-4">
+        <h2 className="font-bold block mb-1">請求先・案件別集計表</h2>
+        {projectSummary && projectSummary.length > 0 ? (
+          <table className="w-full border-collapse border border-gray-400 text-center">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="border border-gray-300 p-1">請求先 (取引先)</th>
+                <th className="border border-gray-300 p-1">案件名</th>
+                <th className="border border-gray-300 p-1 text-right">合計時間</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projectSummary.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="border border-gray-300 p-1 text-left">{item.client_name}</td>
+                  <td className="border border-gray-300 p-1 text-left">{item.project_name}</td>
+                  <td className="border border-gray-300 p-1 text-right">{item.total_hours}h</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="text-gray-500 p-4 text-center border border-gray-300 rounded bg-gray-50">
+            集計データはありません。日報入力で「案件」を登録するとここに集計が表示されます。
+          </div>
+        )}
+      </div>
+
       {/* 特記事項 */}
       <div className="mt-4">
         <label htmlFor="special-notes-textarea" className="font-bold block mb-1">特記事項</label>

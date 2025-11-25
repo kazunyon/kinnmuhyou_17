@@ -19,7 +19,7 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
-  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, approvalDate } = props;
+  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, projectSummary, approvalDate } = props;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -174,6 +174,28 @@ const PrintLayout = React.forwardRef((props, ref) => {
           </tr>
         </tbody>
       </table>
+
+      {/* 請求先・案件別集計表 */}
+      {projectSummary && projectSummary.length > 0 && (
+        <table className="w-full border-collapse border border-black text-xs mt-2">
+          <thead className="bg-gray-200">
+              <tr>
+                  <th className="border border-black p-1 text-left">請求先 (取引先)</th>
+                  <th className="border border-black p-1 text-left">案件名</th>
+                  <th className="border border-black p-1 text-right w-[20%]">合計時間</th>
+              </tr>
+          </thead>
+          <tbody>
+              {projectSummary.map((item, index) => (
+                  <tr key={index}>
+                      <td className="border border-black p-1">{item.client_name}</td>
+                      <td className="border border-black p-1">{item.project_name}</td>
+                      <td className="border border-black p-1 text-right">{item.total_hours}h</td>
+                  </tr>
+              ))}
+          </tbody>
+        </table>
+      )}
 
       {/* 特記事項 */}
       <table className="w-full border-collapse border border-black text-xs mt-2">
