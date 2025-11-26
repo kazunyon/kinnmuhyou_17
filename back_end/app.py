@@ -3,6 +3,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
 import calendar
+import math
 from flask import Flask, jsonify, request, g, send_from_directory
 from flask_cors import CORS
 import sqlite3
@@ -496,25 +497,57 @@ def get_work_records(employee_id, year, month):
         monthly_summary = calculator.calculate_monthly_summary(all_daily_data_for_summary)
 
         # 6. クライアント・案件別集計の計算
-        # 全ての明細を集計
         project_summary_map = {}
         for record in records_for_display:
-            if 'details' in record:
+            if 'details' in record and record['details']:
+                details_total_minutes = sum(d.get('work_time', 0) for d in record['details'])
+
+                start_time = record.get('start_time')
+                end_time = record.get('end_time')
+                break_time = record.get('break_time')
+
+                work_records_minutes = 0
+                if start_time and end_time:
+                    try:
+                        start_minutes = int(start_time.split(':')[0]) * 60 + int(start_time.split(':')[1])
+                        end_minutes = int(end_time.split(':')[0]) * 60 + int(end_time.split(':')[1])
+                        break_minutes = 0
+                        if break_time:
+                            break_minutes = int(break_time.split(':')[0]) * 60 + int(break_time.split(':')[1])
+
+                        work_records_minutes = max(0, end_minutes - start_minutes - break_minutes)
+                    except (ValueError, IndexError):
+                        # 時刻フォーマットが不正な場合はスキップ
+                        pass
+
+                ratio = 1.0
+                if details_total_minutes > 0:
+                    ratio = work_records_minutes / float(details_total_minutes)
+                elif len(record['details']) > 0:
+                    # details があるのに合計が0の場合、均等割り
+                    for detail in record['details']:
+                        key = (detail['client_name'], detail['project_name'])
+                        if key not in project_summary_map:
+                            project_summary_map[key] = 0.0
+                        project_summary_map[key] += float(work_records_minutes) / len(record['details'])
+                    continue # for record in ... の次のループへ
+
                 for detail in record['details']:
                     key = (detail['client_name'], detail['project_name'])
                     if key not in project_summary_map:
-                        project_summary_map[key] = 0
-                    project_summary_map[key] += detail['work_time']
+                        project_summary_map[key] = 0.0
+                    project_summary_map[key] += detail.get('work_time', 0) * ratio
 
         # リスト形式に変換
         project_summary = []
         for (client_name, project_name), total_minutes in project_summary_map.items():
-            hours = total_minutes / 60
+            hours = total_minutes / 60.0
+            truncated_hours = math.floor(hours * 100) / 100.0
             project_summary.append({
                 "client_name": client_name,
                 "project_name": project_name,
-                "total_hours": round(hours, 2), # 小数点2位まで
-                "total_minutes": total_minutes
+                "total_hours": f"{truncated_hours:.2f}",
+                "total_minutes": round(total_minutes)
             })
 
         # ソート: 取引先名、案件名の順
