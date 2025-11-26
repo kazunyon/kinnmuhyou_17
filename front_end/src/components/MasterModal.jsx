@@ -55,6 +55,11 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   // 案件用
   const [projects, setProjects] = useState([]);
   const [newProject, setNewProject] = useState({ client_id: '', project_name: '' });
+  const [selectedClientId, setSelectedClientId] = useState('all');
+
+  const filteredProjects = selectedClientId === 'all'
+    ? projects
+    : projects.filter(p => p.client_id === parseInt(selectedClientId, 10));
 
   // --- データフェッチング ---
   const fetchEmployees = async () => {
@@ -236,7 +241,10 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   const handleClientUpdate = async (client) => {
     if (!client.client_name) return alert("取引先名は必須です");
     try {
-      await axios.put(`${API_URL}/clients/${client.client_id}`, { client_name: client.client_name });
+      await axios.put(`${API_URL}/clients/${client.client_id}`, {
+        client_name: client.client_name,
+        deleted_flag: client.deleted_flag || 0,
+      });
       alert("取引先を更新しました");
       fetchClients();
     } catch (error) {
@@ -246,10 +254,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   };
 
   const handleClientDelete = async (clientId) => {
-    if (!window.confirm("本当に削除しますか？")) return;
+    if (!window.confirm("対象のデータを削除状態にします。よろしいですか？")) return;
+    const client = clients.find(c => c.client_id === clientId);
+    if (!client) return;
+
     try {
-      await axios.delete(`${API_URL}/clients/${clientId}`);
-      alert("取引先を削除しました");
+      await axios.put(`${API_URL}/clients/${clientId}`, {
+        client_name: client.client_name,
+        deleted_flag: 1
+      });
+      alert("取引先を削除状態にしました");
       fetchClients();
     } catch (error) {
       console.error("削除エラー:", error);
@@ -276,7 +290,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     try {
       await axios.put(`${API_URL}/projects/${project.project_id}`, {
         client_id: project.client_id,
-        project_name: project.project_name
+        project_name: project.project_name,
+        deleted_flag: project.deleted_flag || 0,
       });
       alert("案件を更新しました");
       fetchProjects();
@@ -287,10 +302,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   };
 
   const handleProjectDelete = async (projectId) => {
-    if (!window.confirm("本当に削除しますか？")) return;
+    if (!window.confirm("対象のデータを削除状態にします。よろしいですか？")) return;
+    const project = projects.find(p => p.project_id === projectId);
+    if (!project) return;
+
     try {
-      await axios.delete(`${API_URL}/projects/${projectId}`);
-      alert("案件を削除しました");
+      await axios.put(`${API_URL}/projects/${projectId}`, {
+        ...project,
+        deleted_flag: 1
+      });
+      alert("案件を削除状態にしました");
       fetchProjects();
     } catch (error) {
       console.error("削除エラー:", error);
@@ -431,6 +452,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
               <tr>
                 <th className="p-2 border w-20">ID</th>
                 <th className="p-2 border">取引先名</th>
+                <th className="p-2 border w-32">削除フラグ</th>
                 <th className="p-2 border w-32">操作</th>
               </tr>
             </thead>
@@ -445,6 +467,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                         setClients(updated);
                       }}
                     />
+                  </td>
+                  <td className="p-2 border">
+                    <select className="w-full p-1 border rounded" value={client.deleted_flag || 0}
+                      onChange={(e) => {
+                        const updated = clients.map(c => c.client_id === client.client_id ? { ...c, deleted_flag: parseInt(e.target.value, 10) } : c);
+                        setClients(updated);
+                      }}>
+                      <option value={0}>なし</option>
+                      <option value={1}>あり</option>
+                    </select>
                   </td>
                   <td className="p-2 border text-center space-x-2">
                     <button onClick={() => handleClientUpdate(client)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600">更新</button>
@@ -461,11 +493,18 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
           <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
             <span className="font-bold">新規追加:</span>
-            <select className="p-1 border rounded" value={newProject.client_id} onChange={(e) => setNewProject(prev => ({ ...prev, client_id: parseInt(e.target.value) }))}>
-              {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+            <select className="p-1 border rounded" value={newProject.client_id} onChange={(e) => setNewProject(prev => ({ ...prev, client_id: parseInt(e.target.value, 10) }))}>
+              {clients.filter(c => c.deleted_flag !== 1).map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
             </select>
             <input type="text" placeholder="案件名" className="p-1 border rounded flex-grow" value={newProject.project_name} onChange={(e) => setNewProject(prev => ({ ...prev, project_name: e.target.value }))} />
             <button onClick={handleProjectAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
+          </div>
+          <div className="mb-4 flex items-center space-x-2">
+            <span className="font-bold">取引先で絞り込み:</span>
+            <select className="p-1 border rounded" value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}>
+              <option value="all">すべて</option>
+              {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+            </select>
           </div>
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-200 sticky top-0">
@@ -473,11 +512,12 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 <th className="p-2 border w-20">ID</th>
                 <th className="p-2 border w-48">取引先</th>
                 <th className="p-2 border">案件名</th>
+                <th className="p-2 border w-32">削除フラグ</th>
                 <th className="p-2 border w-32">操作</th>
               </tr>
             </thead>
             <tbody>
-              {projects.map(project => (
+              {filteredProjects.map(project => (
                 <tr key={project.project_id} className="hover:bg-gray-50">
                   <td className="p-2 border text-center">{project.project_id}</td>
                   <td className="p-2 border">
@@ -496,6 +536,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                          setProjects(updated);
                        }}
                     />
+                  </td>
+                  <td className="p-2 border">
+                    <select className="w-full p-1 border rounded" value={project.deleted_flag || 0}
+                      onChange={(e) => {
+                        const updated = projects.map(p => p.project_id === project.project_id ? { ...p, deleted_flag: parseInt(e.target.value, 10) } : p);
+                        setProjects(updated);
+                      }}>
+                      <option value={0}>なし</option>
+                      <option value={1}>あり</option>
+                    </select>
                   </td>
                   <td className="p-2 border text-center space-x-2">
                     <button onClick={() => handleProjectUpdate(project)} className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600">更新</button>
