@@ -32,8 +32,8 @@ function App() {
 
   /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: 1) */
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
-  /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 2025年10月) */
-  const [currentDate, setCurrentDate] = useState(new Date('2025-10-01'));
+  /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 現在の日付) */
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   /** @type {[Array<object>, Function]} 1ヶ月分の作業記録の状態管理 */
   const [workRecords, setWorkRecords] = useState([]);
@@ -121,6 +121,39 @@ function App() {
     };
     fetchInitialData();
   }, []);
+
+  /**
+   * アプリケーションの初回読み込み時に、表示するべき初期月を決定します。
+   * 前月のレポートが承認済みかどうかを確認し、未承認の場合は前月を表示します。
+   */
+  useEffect(() => {
+    const determineInitialDate = async () => {
+      const today = new Date();
+      // NOTE: 開発用に現在日付を2025-11-25に固定
+      // const today = new Date('2025-11-25');
+      const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const prevYear = prevMonthDate.getFullYear();
+      const prevMonth = prevMonthDate.getMonth() + 1;
+      const defaultEmployeeId = 1; // 初期表示の社員ID
+
+      try {
+        // 前月の承認状況を確認
+        const res = await axios.get(`${API_URL}/work_records/${defaultEmployeeId}/${prevYear}/${prevMonth}`);
+        const isApproved = res.data.approval_date;
+
+        // 未承認の場合は、表示月を前月に設定
+        if (!isApproved) {
+          setCurrentDate(prevMonthDate);
+        }
+      } catch (error) {
+        // データがなくても(404エラー)、未承認とみなし前月を表示
+        console.log(`前月(${prevYear}/${prevMonth})のデータが見つからないため、初期表示を前月にします。`, error);
+        setCurrentDate(prevMonthDate);
+      }
+    };
+
+    determineInitialDate();
+  }, []); // このuseEffectは初回レンダリング時にのみ実行
 
   /**
    * selectedEmployeeIdまたはownerIdが変更されたときに、
