@@ -262,7 +262,7 @@ def get_clients():
         if include_deleted:
             cursor = db.execute('SELECT * FROM clients ORDER BY client_id')
         else:
-            cursor = db.execute('SELECT * FROM clients WHERE deleted = 0 ORDER BY client_id')
+            cursor = db.execute('SELECT * FROM clients WHERE deleted = 0 OR deleted IS NULL ORDER BY client_id')
         clients = [dict(row) for row in cursor.fetchall()]
         return jsonify(clients)
     except Exception as e:
@@ -336,7 +336,7 @@ def get_projects():
             JOIN clients c ON p.client_id = c.client_id
         '''
         if not include_deleted:
-            query += ' WHERE p.deleted = 0 AND c.deleted = 0'
+            query += ' WHERE (p.deleted = 0 OR p.deleted IS NULL) AND (c.deleted = 0 OR c.deleted IS NULL)'
 
         query += ' ORDER BY p.project_id'
 
