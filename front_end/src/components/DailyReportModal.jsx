@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from 'react-modal';
 import axios from 'axios';
 
@@ -43,6 +43,12 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
+  // --- 自動保存関連の状態 ---
+  const [isSaving, setIsSaving] = useState(false);
+  const debounceTimer = useRef(null);
+  const initialDataLoaded = useRef(false);
+
+
   // --- 明細関連の状態管理 ---
   const [details, setDetails] = useState([]);
   const [clients, setClients] = useState([]);
@@ -50,38 +56,53 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const [totalDetailTime, setTotalDetailTime] = useState(0);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
+  // --- データ取得 ---
   useEffect(() => {
-    const fetchMasters = async () => {
-      try {
-        const params = { include_deleted: includeDeleted };
-        const [clientsRes, projectsRes] = await Promise.all([
-          axios.get(`${API_URL}/clients`, { params }),
-          axios.get(`${API_URL}/projects`, { params })
-        ]);
-        setClients(clientsRes.data);
-        setProjects(projectsRes.data);
-      } catch (error) {
-        console.error("マスタ取得エラー:", error);
-      }
-    };
-    if (isOpen) fetchMasters();
-  }, [isOpen, includeDeleted]);
+    if (!isOpen) return;
 
-  useEffect(() => {
-    if (isOpen && workRecord) {
-      // 既存の明細があればセットする (workRecordにdetailsが含まれている前提)
-      if (workRecord.details && workRecord.details.length > 0) {
-        setDetails(workRecord.details.map(d => ({
-          client_id: d.client_id,
-          project_id: d.project_id,
-          work_time: d.work_time
-        })));
-      } else {
-        // 新規または明細なし
-        setDetails([]);
-      }
-    }
-  }, [isOpen, workRecord]);
+    initialDataLoaded.current = false; // 開くたびにリセット
+
+    const fetchAllData = async () => {
+        try {
+            // マスターデータ取得
+            const params = { include_deleted: includeDeleted };
+            const [clientsRes, projectsRes] = await Promise.all([
+                axios.get(`${API_URL}/clients`, { params }),
+                axios.get(`${API_URL}/projects`, { params })
+            ]);
+            setClients(clientsRes.data);
+            setProjects(projectsRes.data);
+
+            // 時間設定
+            setTimes({
+                startTime: workRecord?.start_time || '09:00',
+                endTime: workRecord?.end_time || '18:00',
+                breakTime: workRecord?.break_time || '01:00'
+            });
+
+            // 日報データ取得
+            const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
+            const initialReportText = {
+                work_summary: workRecord?.work_content || '',
+                problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
+            };
+            setReportData(response.data ? { ...initialReportText, ...response.data } : initialReportText);
+
+            // 明細設定
+            const initialDetails = workRecord?.details?.map(d => ({
+                client_id: d.client_id, project_id: d.project_id, work_time: d.work_time
+            })) || [];
+            setDetails(initialDetails);
+
+        } catch (error) {
+            console.error("日報データの読み込みに失敗しました:", error);
+        } finally {
+            // 全ての初期データセットが完了したことをマーク
+            initialDataLoaded.current = true;
+        }
+    };
+    fetchAllData();
+  }, [isOpen, employeeId, date, workRecord, includeDeleted]);
 
   // 明細合計時間の計算
   useEffect(() => {
@@ -89,39 +110,30 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     setTotalDetailTime(total);
   }, [details]);
 
-
-  /**
-   * モーダルが開いたとき、または主要なpropが変更されたときに日報データを取得します。
-   * 親から渡された作業記録を基に時間と作業内容を初期設定し、
-   * その他の日報項目はAPIからフェッチします。
-   */
+  // --- 自動保存 ---
   useEffect(() => {
-    if (isOpen && employeeId && date) {
-      setTimes({
-          startTime: workRecord?.start_time || '09:00',
-          endTime: workRecord?.end_time || '18:00',
-          breakTime: workRecord?.break_time || '01:00'
-      });
-      
-      const fetchReport = async () => {
-        try {
-          const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
-          const initialData = {
-              work_summary: workRecord?.work_content || '',
-              problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
-          };
-          if (response.data) {
-            setReportData({ ...initialData, ...response.data });
-          } else {
-            setReportData(initialData);
-          }
-        } catch (error) {
-          console.error("日報データの取得に失敗しました:", error);
-        }
-      };
-      fetchReport();
+    // 初期データ読み込み中、またはモーダルが閉じていれば何もしない
+    if (!initialDataLoaded.current || !isOpen) {
+        return;
     }
-  }, [isOpen, employeeId, date, workRecord]);
+
+    // 前回のタイマーをクリア
+    if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+    }
+
+    // 新しいタイマーをセット
+    debounceTimer.current = setTimeout(() => {
+        handleSave();
+    }, 1500); // 1.5秒のデバウンス
+
+    // クリーンアップ関数
+    return () => {
+        if (debounceTimer.current) {
+            clearTimeout(debounceTimer.current);
+        }
+    };
+  }, [reportData, times, details]); // これらのいずれかが変更されたら発火
 
   /**
    * 時間選択の変更をハンドリングし、stateを更新します。
@@ -144,7 +156,9 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
    */
   const handleDataChange = (field, value) => {
     setReportData(prev => ({ ...prev, [field]: value }));
-    if (field === 'work_summary' && value.trim() === '休み') {
+
+    const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+    if (field === 'work_summary' && restKeywords.includes(value.trim())) {
       setTimes({ startTime: '00:00', endTime: '00:00', breakTime: '00:00' });
     }
   };
@@ -181,16 +195,15 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   };
 
   /**
-   * 「適用して閉じる」ボタンのハンドラ。
-   * 日報データをDBに保存し、親コンポーネントに変更を通知してからモーダルを閉じます。
+   * 日報データをDBに自動保存します。
    */
-  const handleApplyAndClose = async () => {
-    // 時間チェック
-    const workDuration = calculateWorkDuration();
-    if (Math.abs(workDuration - totalDetailTime) > 0 && details.length > 0) {
-        if (!window.confirm(`作業明細の合計(${totalDetailTime}分)と実働時間(${workDuration}分)が一致していません。保存しますか？`)) {
-            return;
-        }
+  const handleSave = async () => {
+    setIsSaving(true);
+
+    let finalTimes = { ...times };
+    const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+    if (restKeywords.includes(reportData.work_summary.trim())) {
+      finalTimes = { startTime: '00:00', endTime: '00:00', breakTime: '00:00' };
     }
 
     try {
@@ -198,31 +211,28 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
         employee_id: employeeId,
         date: date,
         ...reportData,
-        start_time: times.startTime,
-        end_time: times.endTime,
-        break_time: times.breakTime,
-        details: details // 明細も送信
+        start_time: finalTimes.startTime,
+        end_time: finalTimes.endTime,
+        break_time: finalTimes.breakTime,
+        details: details
       });
 
-      // 親への通知: work_contentはサーバー側で生成されるが、即時反映のために
-      // クライアント側でも簡易生成して渡すか、リロードを促すフラグを立てる
-      // ここでは簡易生成はせず、リロードを促すためコールバックには主要データのみ渡す
-      // (App.jsx側で再取得処理が走るように onReportUpdate(true) を呼んでいるのでOK)
-
+      // 親コンポーネントの状態を更新
       onSave({
           day: new Date(date).getDate(),
-          start_time: times.startTime,
-          end_time: times.endTime,
-          break_time: times.breakTime,
-          work_content: reportData.work_summary, // テキストエリアの値を優先表示、またはサーバー生成値を待つなら空でも
-          details: details // クライアント反映用
+          start_time: finalTimes.startTime,
+          end_time: finalTimes.endTime,
+          break_time: finalTimes.breakTime,
+          work_content: reportData.work_summary,
+          details: details
       });
+      onReportUpdate(true); // 親に再取得を促す
 
-      onReportUpdate(true);
-      onRequestClose();
     } catch (error) {
-      console.error("日報データの保存に失敗しました:", error);
+      console.error("日報データの自動保存に失敗しました:", error);
       alert("日報データの保存に失敗しました。");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -285,10 +295,12 @@ ${reportData.thoughts}`;
    * @type {JSX.Element}
    */
   const actionButtons = (
-    <div className="flex justify-end space-x-4">
+    <div className="flex justify-end items-center space-x-4">
+      <span className={`text-sm text-gray-500 transition-opacity duration-300 ${isSaving ? 'opacity-100' : 'opacity-0'}`}>
+        保存中...
+      </span>
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-      <button onClick={handleApplyAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
     </div>
   );
 
