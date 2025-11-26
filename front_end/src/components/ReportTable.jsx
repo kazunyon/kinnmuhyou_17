@@ -75,8 +75,9 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
       // 更新したレコードの値を設定
       record[field] = value;
 
-      // もし作業内容が「休み」と入力されたら、関連する時間を0にする
-      if (field === 'work_content' && value.trim() === '休み') {
+      // 休暇関連のキーワードが入力されたら、関連する時間を0にする
+      const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+      if (field === 'work_content' && restKeywords.includes(value.trim())) {
         record.start_time = '00:00';
         record.end_time = '00:00';
         record.break_time = '00:00';
@@ -153,6 +154,26 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
               isSaturday ? 'bg-saturday-blue' : // 土曜
               ''; // 平日
 
+            // 作業内容に応じてテキストエリアのクラスを決定するヘルパー関数
+            const getTextareaClassName = (content) => {
+              const baseClass = "w-full h-full p-1 border-none resize-none min-h-[40px]";
+              const readOnlyClass = isReadOnly ? ' bg-gray-100' : '';
+              const trimmedContent = (content || '').trim();
+
+              let colorClass = 'bg-transparent';
+              if (['代休', '振休'].includes(trimmedContent)) {
+                  colorClass = 'bg-yellow-200 text-center';
+              } else if (trimmedContent === '有給') {
+                  colorClass = 'bg-blue-200 text-center';
+              } else if (trimmedContent === '欠勤') {
+                  colorClass = 'bg-red-200 text-center text-white';
+              } else if (trimmedContent === '休み') {
+                  colorClass = 'rest-day-badge text-center'; // 旧「休み」用のクラス
+              }
+
+              return `${baseClass} ${colorClass} ${readOnlyClass}`;
+            };
+
             return (
               <tr key={day} className={rowClass} onClick={() => setSelectedRow(i)} onDoubleClick={() => onRowClick(record)}>
                 <td className="border border-gray-300 p-1">{day}</td>
@@ -163,11 +184,7 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
                   <textarea
                     value={record.work_content || ''}
                     onChange={(e) => handleInputChange(i, 'work_content', e.target.value)}
-                    className={
-                      `w-full h-full p-1 border-none resize-none min-h-[40px] ` +
-                      ((record.work_content || '').trim() === '休み' ? "rest-day-badge text-center" : "bg-transparent") +
-                      (isReadOnly ? ' bg-gray-100' : '')
-                    }
+                    className={getTextareaClassName(record.work_content)}
                     rows="2"
                     readOnly={isReadOnly}
                   />
