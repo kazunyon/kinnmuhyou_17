@@ -73,7 +73,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
 
   const fetchClients = async () => {
     try {
-      const res = await axios.get(`${API_URL}/clients`);
+      const res = await axios.get(`${API_URL}/clients?include_deleted=true`);
       setClients(res.data);
       // 新規案件のデフォルトクライアントID設定
       if (res.data.length > 0 && !newProject.client_id) {
@@ -86,7 +86,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
 
   const fetchProjects = async () => {
     try {
-      const res = await axios.get(`${API_URL}/projects`);
+      const res = await axios.get(`${API_URL}/projects?include_deleted=true`);
       setProjects(res.data);
     } catch (error) {
       console.error("案件データの取得に失敗しました:", error);
@@ -243,7 +243,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     try {
       await axios.put(`${API_URL}/clients/${client.client_id}`, {
         client_name: client.client_name,
-        deleted_flag: client.deleted_flag || 0,
+        deleted_flag: client.deleted || 0,
       });
       alert("取引先を更新しました");
       fetchClients();
@@ -291,7 +291,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       await axios.put(`${API_URL}/projects/${project.project_id}`, {
         client_id: project.client_id,
         project_name: project.project_name,
-        deleted_flag: project.deleted_flag || 0,
+        deleted_flag: project.deleted || 0,
       });
       alert("案件を更新しました");
       fetchProjects();
@@ -469,9 +469,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                     />
                   </td>
                   <td className="p-2 border">
-                    <select className="w-full p-1 border rounded" value={client.deleted_flag || 0}
+                    <select className="w-full p-1 border rounded" value={client.deleted || 0}
                       onChange={(e) => {
-                        const updated = clients.map(c => c.client_id === client.client_id ? { ...c, deleted_flag: parseInt(e.target.value, 10) } : c);
+                        const updated = clients.map(c => c.client_id === client.client_id ? { ...c, deleted: parseInt(e.target.value, 10) } : c);
                         setClients(updated);
                       }}>
                       <option value={0}>なし</option>
@@ -494,7 +494,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
           <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
             <span className="font-bold">新規追加:</span>
             <select className="p-1 border rounded" value={newProject.client_id} onChange={(e) => setNewProject(prev => ({ ...prev, client_id: parseInt(e.target.value, 10) }))}>
-              {clients.filter(c => c.deleted_flag !== 1).map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+              {clients.filter(c => c.deleted !== 1).map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
             </select>
             <input type="text" placeholder="案件名" className="p-1 border rounded flex-grow" value={newProject.project_name} onChange={(e) => setNewProject(prev => ({ ...prev, project_name: e.target.value }))} />
             <button onClick={handleProjectAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
@@ -538,9 +538,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                     />
                   </td>
                   <td className="p-2 border">
-                    <select className="w-full p-1 border rounded" value={project.deleted_flag || 0}
+                    <select className="w-full p-1 border rounded" value={project.deleted || 0}
                       onChange={(e) => {
-                        const updated = projects.map(p => p.project_id === project.project_id ? { ...p, deleted_flag: parseInt(e.target.value, 10) } : p);
+                        const updated = projects.map(p => p.project_id === project.project_id ? { ...p, deleted: parseInt(e.target.value, 10) } : p);
                         setProjects(updated);
                       }}>
                       <option value={0}>なし</option>

@@ -264,6 +264,7 @@ def get_clients():
         else:
             cursor = db.execute('SELECT * FROM clients WHERE deleted = 0 OR deleted IS NULL ORDER BY client_id')
         clients = [dict(row) for row in cursor.fetchall()]
+        app.logger.info(f"{len(clients)}件の取引先データを取得しました。")
         return jsonify(clients)
     except Exception as e:
         app.logger.error(f"取引先取得エラー: {e}")
@@ -292,13 +293,19 @@ def update_client(client_id):
     """取引先を更新します。"""
     data = request.json
     client_name = data.get('client_name')
+    deleted = data.get('deleted_flag', 0)  # フロントエンドは 'deleted_flag' を使用
+
     if not client_name:
         return jsonify({"error": "取引先名は必須です"}), 400
 
     try:
         db = get_db()
-        db.execute('UPDATE clients SET client_name = ? WHERE client_id = ?', (client_name, client_id))
+        db.execute(
+            'UPDATE clients SET client_name = ?, deleted = ? WHERE client_id = ?',
+            (client_name, deleted, client_id)
+        )
         db.commit()
+        app.logger.info(f"取引先更新完了: ID={client_id}, Name='{client_name}', Deleted={deleted}")
         return jsonify({"message": "更新しました"}), 200
     except Exception as e:
         db.rollback()
@@ -342,6 +349,7 @@ def get_projects():
 
         cursor = db.execute(query)
         projects = [dict(row) for row in cursor.fetchall()]
+        app.logger.info(f"{len(projects)}件の案件データを取得しました。 include_deleted={include_deleted}")
         return jsonify(projects)
     except Exception as e:
         app.logger.error(f"案件取得エラー: {e}")
@@ -372,13 +380,19 @@ def update_project(project_id):
     data = request.json
     client_id = data.get('client_id')
     project_name = data.get('project_name')
+    deleted = data.get('deleted_flag', 0)  # フロントエンドは 'deleted_flag' を使用
+
     if not client_id or not project_name:
         return jsonify({"error": "取引先と案件名は必須です"}), 400
 
     try:
         db = get_db()
-        db.execute('UPDATE projects SET client_id = ?, project_name = ? WHERE project_id = ?', (client_id, project_name, project_id))
+        db.execute(
+            'UPDATE projects SET client_id = ?, project_name = ?, deleted = ? WHERE project_id = ?',
+            (client_id, project_name, deleted, project_id)
+        )
         db.commit()
+        app.logger.info(f"案件更新完了: ID={project_id}, Name='{project_name}', Deleted={deleted}")
         return jsonify({"message": "更新しました"}), 200
     except Exception as e:
         db.rollback()

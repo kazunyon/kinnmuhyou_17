@@ -33,7 +33,7 @@ function App() {
   /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: 1) */
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
   /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 2025年10月) */
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date('2025-10-01'));
 
   /** @type {[Array<object>, Function]} 1ヶ月分の作業記録の状態管理 */
   const [workRecords, setWorkRecords] = useState([]);
@@ -101,6 +101,7 @@ function App() {
    */
   useEffect(() => {
     const fetchInitialData = async () => {
+      setIsLoading(true);
       try {
         const [empRes, compRes, ownerRes] = await Promise.all([
           axios.get(`${API_URL}/employees`),
@@ -114,6 +115,8 @@ function App() {
       } catch (error) {
         console.error("初期データの取得に失敗しました:", error);
         setMessage("サーバーとの通信に失敗しました。");
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchInitialData();

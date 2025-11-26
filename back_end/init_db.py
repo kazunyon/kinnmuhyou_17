@@ -63,6 +63,24 @@ def init_db():
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """, employees_data_to_insert)
         print("社員マスターに初期データを挿入しました。")
+
+        # 取引先マスター
+        clients_data = [
+            (1, '株式会社A'),
+            (2, '株式会社B'),
+            (3, '株式会社C'),
+        ]
+        cursor.executemany("INSERT INTO clients (client_id, client_name) VALUES (?, ?)", clients_data)
+        print("取引先マスターに初期データを挿入しました。")
+
+        # 案件マスター
+        projects_data = [
+            (1, 1, 'A社Webサイトリニューアル'),
+            (2, 1, 'A社基幹システム刷新'),
+            (3, 2, 'B社スマホアプリ開発'),
+        ]
+        cursor.executemany("INSERT INTO projects (project_id, client_id, project_name) VALUES (?, ?, ?)", projects_data)
+        print("案件マスターに初期データを挿入しました。")
         
         # 祝日マスター (2025年〜2027年)
         holidays_data = [
