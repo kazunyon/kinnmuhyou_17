@@ -24,14 +24,18 @@ const modalStyles = {
 Modal.setAppElement('#root');
 
 /**
- * 社員情報のマスターメンテナンスを行うモーダルコンポーネント。
- * オーナー認証、全社員リストの表示・更新、新規社員の追加機能を提供します。
+ * 社員情報、取引先、案件のマスターメンテナンスを行うモーダルコンポーネント。
+ * 認証、各マスターデータの表示・更新、新規追加機能を提供します。
  * @param {object} props - コンポーネントのプロパティ。
  * @param {boolean} props.isOpen - モーダルが開いているか。
  * @param {Function} props.onRequestClose - モーダルを閉じる関数。
  * @param {Function} props.onMasterUpdate - 社員情報が更新されたことを親に通知する関数。
  * @param {Function} props.onSelectEmployee - 社員が「参照」されたことを親に通知する関数。
+ * @param {number} props.selectedEmployeeId - 現在選択中の社員ID。
  * @param {Array<object>} props.companies - 会社リスト。
+ * @param {object} props.auth - 認証状態オブジェクト。
+ * @param {Function} props.setAuth - 認証状態を更新する関数。
+ * @param {Array<object>} props.employees - 全社員のリスト。
  * @returns {JSX.Element} レンダリングされたマスターメンテナンスモーダル。
  */
 const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, employees: allEmployees }) => {

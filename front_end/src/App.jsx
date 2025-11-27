@@ -240,6 +240,7 @@ function App() {
 
   /**
    * 月次レポートの承認を取り消します。
+   * サーバーに承認取り消しをリクエストし、成功した場合、UI上の承認日を更新します。
    * @async
    */
   const handleCancelApproval = async () => {
