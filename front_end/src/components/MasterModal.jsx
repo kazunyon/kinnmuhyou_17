@@ -32,11 +32,9 @@ Modal.setAppElement('#root');
  * @param {Function} props.onMasterUpdate - 社員情報が更新されたことを親に通知する関数。
  * @param {Function} props.onSelectEmployee - 社員が「参照」されたことを親に通知する関数。
  * @param {Array<object>} props.companies - 会社リスト。
- * @param {object} props.auth - 親コンポーネントで管理される認証状態。
- * @param {Function} props.setAuth - 親の認証状態を更新する関数。
  * @returns {JSX.Element} レンダリングされたマスターメンテナンスモーダル。
  */
-const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, ownerId, ownerName }) => {
+const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, employees: allEmployees }) => {
   // --- 状態管理 ---
   const [activeTab, setActiveTab] = useState('employees'); // 'employees', 'clients', 'projects'
 
@@ -47,6 +45,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       employee_name: '', department_name: '', employee_type: '正社員'
   });
   const [passwordInput, setPasswordInput] = useState('');
+  const [authUserId, setAuthUserId] = useState(selectedEmployeeId);
 
   // 取引先用
   const [clients, setClients] = useState([]);
@@ -140,18 +139,14 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       setNewEmployee(prev => ({...prev, [field]: value}));
   };
 
-  /**
-   * オーナー認証を実行します。
-   * @async
-   */
   const handleAuthenticate = async () => {
-    if (!ownerId || !passwordInput) {
-      alert('オーナー情報が読み込まれていないか、パスワードが入力されていません。');
+    if (!authUserId || !passwordInput) {
+      alert('認証する社員を選択し、パスワードを入力してください。');
       return;
     }
     try {
       const res = await axios.post(`${API_URL}/master/authenticate`, {
-        employee_id: ownerId,
+        employee_id: authUserId,
         password: passwordInput
       });
 
@@ -162,34 +157,35 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
 
       setAuth({
         isAuthenticated: true,
-        isOwner: res.data.is_owner,
+        isOwner: true, // Anyone authenticated can edit
+        userId: authUserId,
         password: passwordInput,
         timestamp: new Date().getTime(),
       });
 
-      alert(res.data.is_owner ? 'オーナーとして認証しました。編集が可能です。' : '認証しました。参照のみ可能です。');
+      alert('認証に成功しました。編集が可能です。');
       setPasswordInput('');
     } catch (error) {
       console.error("認証処理中にエラーが発生しました:", error);
       alert(error.response?.data?.message || '認証中にサーバーエラーが発生しました。');
-      setAuth({ isAuthenticated: false, isOwner: false, password: '', timestamp: null });
+      setAuth({ isAuthenticated: false, isOwner: false, userId: null, password: '', timestamp: null });
     }
   };
 
   /**
-   * 社員情報の更新をサーバーに送信します。オーナー権限が必要です。
+   * 社員情報の更新をサーバーに送信します。
    * @param {object} employee - 更新対象の社員オブジェクト。
    * @async
    */
   const handleUpdate = async (employee) => {
-    if (!auth.isOwner) {
-      alert('オーナー権限がないため更新できません。');
+    if (!auth.isAuthenticated) {
+      alert('認証が必要です。');
       return;
     }
     const dataToSend = {
       ...employee,
-      owner_id: ownerId,
-      owner_password: auth.password,
+      auth_user_id: auth.userId,
+      auth_password: auth.password,
     };
     delete dataToSend.password;
     delete dataToSend.master_flag;
@@ -206,12 +202,12 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   };
 
   /**
-   * 新規社員の情報をサーバーに送信します。オーナー権限が必要です。
+   * 新規社員の情報をサーバーに送信します。
    * @async
    */
   const handleAdd = async () => {
-    if (!auth.isOwner) {
-      alert('オーナー権限がないため追加できません。');
+    if (!auth.isAuthenticated) {
+      alert('認証が必要です。');
       return;
     }
     if(!newEmployee.employee_name || !newEmployee.department_name) {
@@ -220,8 +216,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
     }
     const dataToSend = {
         ...newEmployee,
-        owner_id: ownerId,
-        owner_password: auth.password,
+        auth_user_id: auth.userId,
+        auth_password: auth.password,
     };
     try {
         await axios.post(`${API_URL}/employee`, dataToSend);
@@ -358,19 +354,21 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
 
       {activeTab === 'employees' && (
         <>
-        {/* --- オーナー情報 & 認証エリア (社員タブのみ) --- */}
+        {/* --- 認証エリア --- */}
         <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
-            <h3 className="text-lg font-semibold mb-3">オーナー情報</h3>
+            <h3 className="text-lg font-semibold mb-3">編集認証</h3>
             <div className="flex items-center space-x-4">
                 <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
-                    <span className="font-semibold">ID :</span>
-                    <input type="text" value={ownerId || ''} disabled className="p-2 border rounded w-20 bg-gray-200" />
-                    <span className="font-semibold">オーナー氏名:</span>
-                    <input type="text" value={ownerName || ''} disabled className="p-2 border rounded w-48 bg-gray-200" />
+                    <span className="font-semibold">認証ユーザー:</span>
+                    <select value={authUserId} onChange={(e) => setAuthUserId(parseInt(e.target.value, 10))} className="p-2 border rounded">
+                        {allEmployees.map(e => <option key={e.employee_id} value={e.employee_id}>{e.employee_name}</option>)}
+                    </select>
                 </fieldset>
                 <span className="font-semibold">パスワード:</span>
-                <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" />
-                <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">認証</button>
+                <input type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} className="p-2 border rounded" placeholder="XXXXXX" disabled={auth.isAuthenticated} />
+                <button onClick={handleAuthenticate} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400" disabled={auth.isAuthenticated}>
+                  {auth.isAuthenticated ? '認証済み' : '認証'}
+                </button>
             </div>
         </div>
 
@@ -391,27 +389,24 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 {employees.map(emp => {
                     const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
-                    // 更新権限のロジック
-                    const canUpdate = auth.isOwner && emp.employee_id === ownerId;
-
                     return (
                     <tr key={emp.employee_id}
-                        className={`hover:bg-gray-50 cursor-pointer ${!canUpdate ? 'bg-gray-100' : ''} ${selectedEmployeeId === emp.employee_id ? 'bg-blue-100' : ''}`}
+                        className={`hover:bg-gray-50 cursor-pointer ${selectedEmployeeId === emp.employee_id ? 'bg-blue-100' : ''}`}
                         onClick={() => onSelectEmployee(emp.employee_id)}>
                         <td className="p-2 border">{emp.employee_id}</td>
                         <td className="p-2 border">{companyName}</td>
-                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
-                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate} /></td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.department_name || ''} onChange={(e) => handleInputChange(emp.employee_id, 'department_name', e.target.value)} className="w-full p-1 border rounded" /></td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}><input type="text" value={emp.employee_name} onChange={(e) => handleInputChange(emp.employee_id, 'employee_name', e.target.value)} className="w-full p-1 border rounded" /></td>
                         <td className="p-2 border" onClick={(e) => e.stopPropagation()}>
-                        <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!canUpdate}>
+                        <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded">
                                 <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
                         </select>
                         </td>
-                        <td className="p-2 border text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" disabled={!canUpdate} /></td>
+                        <td className="p-2 border text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" /></td>
                         <td className="p-2 border text-center font-semibold text-teal-600">
                         {selectedEmployeeId === emp.employee_id ? '参照' : ''}
                         </td>
-                        <td className="p-2 border text-center"><button onClick={(e) => { e.stopPropagation(); handleUpdate(emp); }} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:bg-gray-400" disabled={!canUpdate}>更新</button></td>
+                        <td className="p-2 border text-center"><button onClick={(e) => { e.stopPropagation(); handleUpdate(emp); }} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">更新</button></td>
                     </tr>
                     )
                 })}
@@ -419,19 +414,19 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 <tr className="bg-green-50">
                     <td className="p-2 border">新規</td>
                     <td className="p-2 border">
-                        <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
+                        <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded">
                         {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
                         </select>
                     </td>
-                    <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" disabled={!auth.isOwner} /></td>
-                    <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" disabled={!auth.isOwner} /></td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" /></td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" /></td>
                     <td className="p-2 border">
-                        <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded" disabled={!auth.isOwner}>
+                        <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded">
                             <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
                         </select>
                     </td>
                     <td className="p-2 border" colSpan="2"></td>
-                    <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600" disabled={!auth.isOwner}>追加</button></td>
+                    <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">追加</button></td>
                 </tr>
                 </tbody>
             </table>

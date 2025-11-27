@@ -28,7 +28,6 @@ const toJapaneseEra = (date) => {
  * @param {string} props.specialNotes - 月次の特記事項。
  * @param {boolean} props.isLoading - データ読み込み中かを示すフラグ。
  * @param {string} props.message - ユーザーへの通知メッセージ。
- * @param {boolean} props.isReadOnly - 表示が読み取り専用かを示すフラグ。
  * @param {Function} props.onDateChange - 年月が変更されたときのコールバック関数。
  * @param {Function} props.onWorkRecordsChange - 作業記録が変更されたときのコールバック関数。
  * @param {Function} props.onSpecialNotesChange - 特記事項が変更されたときのコールバック関数。
@@ -40,10 +39,10 @@ const toJapaneseEra = (date) => {
  * @returns {JSX.Element} レンダリングされた作業報告書スクリーン。
  */
 const ReportScreen = ({
-  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
+  employees, selectedEmployee, onEmployeeChange, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
   projectSummary, // 追加
   approvalDate,
-  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
+  isLoading, message, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
 }) => {
 
@@ -79,18 +78,25 @@ const ReportScreen = ({
   return (
     <div className="container mx-auto p-4 bg-white shadow-lg rounded-lg">
       <header className="grid grid-cols-3 items-center mb-4">
-        {/* 年月選択 */}
-        <div className="flex items-center space-x-2">
-           <select value={currentDate.getFullYear()} onChange={handleYearChange} className="p-1 border rounded">
-             {years.map(year => (
-               <option key={year} value={year}>{toJapaneseEra(new Date(year, 0, 1))}</option>
-             ))}
-           </select>
-           <select value={currentDate.getMonth()} onChange={handleMonthChange} className="p-1 border rounded">
-             {months.map(month => (
-               <option key={month} value={month}>{month + 1}月</option>
-             ))}
-           </select>
+        {/* 年月・社員選択 */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <select value={currentDate.getFullYear()} onChange={handleYearChange} className="p-1 border rounded">
+              {years.map(year => (
+                <option key={year} value={year}>{toJapaneseEra(new Date(year, 0, 1))}</option>
+              ))}
+            </select>
+            <select value={currentDate.getMonth()} onChange={handleMonthChange} className="p-1 border rounded">
+              {months.map(month => (
+                <option key={month} value={month}>{month + 1}月</option>
+              ))}
+            </select>
+          </div>
+          <select value={selectedEmployee?.employee_id} onChange={onEmployeeChange} className="p-1 border rounded">
+            {employees.map(emp => (
+              <option key={emp.employee_id} value={emp.employee_id}>{emp.employee_name}</option>
+            ))}
+          </select>
         </div>
 
         <h1 className="text-center text-lg font-bold" style={{fontSize: '14pt', letterSpacing: '0.5em'}}>
@@ -105,8 +111,7 @@ const ReportScreen = ({
             <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
             <button
               onClick={onSave}
-              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-              disabled={isReadOnly}
+              className="px-4 py-1 rounded bg-blue-600 text-white hover:bg-blue-500"
             >
               保存
             </button>
@@ -133,20 +138,18 @@ const ReportScreen = ({
         <div className="flex flex-col text-10pt" style={{ width: '100pt', height: '50pt', border: '1px solid black' }}>
           <div className="text-center border-b border-black h-1/3 flex-none">印鑑</div>
           <div
-            className={`grow flex items-center justify-center ${!isReadOnly && !approvalDate ? 'cursor-pointer hover:bg-gray-100' : ''}`}
-            onClick={!isReadOnly && !approvalDate ? onApprove : undefined}
+            className={`grow flex items-center justify-center ${!approvalDate ? 'cursor-pointer hover:bg-gray-100' : ''}`}
+            onClick={!approvalDate ? onApprove : undefined}
           >
             {approvalDate ? (
               <div className="text-red-500 text-center">
                 <p>{selectedEmployee?.employee_name?.split(' ')[0] || ''} {new Date(approvalDate).getMonth() + 1}/{new Date(approvalDate).getDate()}</p>
-                {!isReadOnly && (
-                  <p
-                    className="text-blue-600 hover:underline cursor-pointer"
-                    onClick={onCancelApproval}
-                  >
-                    キャンセル
-                  </p>
-                )}
+                <p
+                  className="text-blue-600 hover:underline cursor-pointer"
+                  onClick={onCancelApproval}
+                >
+                  キャンセル
+                </p>
               </div>
             ) : null}
           </div>
@@ -165,7 +168,7 @@ const ReportScreen = ({
           onWorkRecordsChange={onWorkRecordsChange}
           onMonthlySummaryChange={onMonthlySummaryChange}
           onRowClick={onRowClick}
-          isReadOnly={isReadOnly}
+          isReadOnly={false}
         />
       )}
       
@@ -206,9 +209,8 @@ const ReportScreen = ({
           value={specialNotes}
           onChange={(e) => onSpecialNotesChange(e.target.value)}
           rows="5"
-          className={`w-full p-2 border rounded ${isReadOnly ? 'bg-gray-100' : ''}`}
-          placeholder={isReadOnly ? "オーナーのみ編集可能です。" : "この月の特記事項を入力してください..."}
-          readOnly={isReadOnly}
+          className="w-full p-2 border rounded"
+          placeholder="この月の特記事項を入力してください..."
         ></textarea>
       </div>
     </div>

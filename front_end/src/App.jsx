@@ -30,8 +30,11 @@ function App() {
   /** @type {[Array<object>, Function]} 会社リストの状態管理 */
   const [companies, setCompanies] = useState([]);
 
-  /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: 1) */
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
+  /** @type {[number, Function]} 選択されている社員IDの状態管理 (初期値: ローカルストレージから取得、なければ1) */
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => {
+    const savedId = localStorage.getItem('selectedEmployeeId');
+    return savedId ? parseInt(savedId, 10) : 1;
+  });
   /** @type {[Date, Function]} 表示対象の年月の状態管理 (初期値: 現在の日付) */
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -65,13 +68,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   /** @type {[string, Function]} ユーザーへの通知メッセージの状態管理 */
   const [message, setMessage] = useState('');
-  /** @type {[number|null, Function]} オーナー社員IDの状態管理 */
-  const [ownerId, setOwnerId] = useState(null);
-  /** @type {[string|null, Function]} オーナー社員名の状態管理 */
-  const [ownerName, setOwnerName] = useState(null);
-  /** @type {[boolean, Function]} 表示中のレポートがオーナーのものかどうかの状態管理 */
-  const [isViewingOwnerReport, setIsViewingOwnerReport] = useState(false);
-  
   /** @type {[boolean, Function]} 日報入力モーダルの表示状態 */
   const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false);
   /** @type {[boolean, Function]} マスターメンテナンスモーダルの表示状態 */
@@ -82,7 +78,8 @@ function App() {
   /** @type {[object, Function]} マスターメンテナンスの認証状態 */
   const [masterAuthState, setMasterAuthState] = useState({
     isAuthenticated: false,
-    isOwner: false,
+    isOwner: false, // This will always be true on successful auth now
+    userId: null,
     password: '',
     timestamp: null,
   });
@@ -103,13 +100,10 @@ function App() {
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        const [empRes, compRes, ownerRes] = await Promise.all([
+        const [empRes, compRes] = await Promise.all([
           axios.get(`${API_URL}/employees`),
           axios.get(`${API_URL}/companies`),
-          axios.get(`${API_URL}/owner_info`),
         ]);
-        setOwnerId(parseInt(ownerRes.data.owner_id, 10));
-        setOwnerName(ownerRes.data.owner_name);
         setEmployees(empRes.data);
         setCompanies(compRes.data);
       } catch (error) {
@@ -156,14 +150,11 @@ function App() {
   }, []); // このuseEffectは初回レンダリング時にのみ実行
 
   /**
-   * selectedEmployeeIdまたはownerIdが変更されたときに、
-   * 表示中のレポートがオーナーのものかどうかを判定します。
+   * selectedEmployeeIdが変更されたときに、その値をローカルストレージに保存します。
    */
   useEffect(() => {
-    if (ownerId !== null) {
-      setIsViewingOwnerReport(selectedEmployeeId === ownerId);
-    }
-  }, [selectedEmployeeId, ownerId]);
+    localStorage.setItem('selectedEmployeeId', selectedEmployeeId);
+  }, [selectedEmployeeId]);
 
   /**
    * selectedEmployeeIdまたはcurrentDateが変更されたときに、
@@ -248,28 +239,6 @@ function App() {
   // --- イベントハンドラ ---
 
   /**
-   * オーナー情報とマスター認証の状態をリフレッシュします。
-   * num.idが変更された後に、UIの状態を正しく同期させるために使います。
-   * @async
-   */
-  const refreshOwnerAndAuth = async () => {
-    try {
-      const ownerRes = await axios.get(`${API_URL}/owner_info`);
-      setOwnerId(parseInt(ownerRes.data.owner_id, 10));
-      setOwnerName(ownerRes.data.owner_name);
-      setMasterAuthState({
-        isAuthenticated: false,
-        isOwner: false,
-        password: '',
-        timestamp: null,
-      });
-    } catch (error) {
-      console.error("オーナー情報の再取得に失敗しました:", error);
-      setMessage("オーナー情報の更新に失敗しました。");
-    }
-  };
-
-  /**
    * 月次レポートの承認を取り消します。
    * @async
    */
@@ -292,6 +261,14 @@ function App() {
         setMessage(error.response?.data?.error || "承認の取り消しに失敗しました。");
       }
     }
+  };
+
+  /**
+   * 社員選択が変更されたときのハンドラ。
+   * @param {React.ChangeEvent<HTMLSelectElement>} e - イベントオブジェクト。
+   */
+  const handleEmployeeChange = (e) => {
+    setSelectedEmployeeId(parseInt(e.target.value, 10));
   };
 
   /**
@@ -419,11 +396,10 @@ function App() {
    * 5分間の認証タイムアウトをチェックします。
    */
   const handleOpenMaster = () => {
-/*    const fiveMinutes = 5 * 60 * 1000; */
-    const fiveMinutes = 0.1 * 60 * 1000;
+    const fiveMinutes = 5 * 60 * 1000;
     if (masterAuthState.timestamp && (new Date().getTime() - masterAuthState.timestamp > fiveMinutes)) {
-      /* alert('認証の有効期限が切れました。再度認証してください。'); */
-      setMasterAuthState({ isAuthenticated: false, isOwner: false, password: '', timestamp: null });
+      alert('認証の有効期限が切れました。再度認証してください。');
+      setMasterAuthState({ isAuthenticated: false, isOwner: false, userId: null, password: '', timestamp: null });
     }
     setMasterModalOpen(true);
   };
@@ -439,7 +415,9 @@ function App() {
   return (
     <div className="bg-gray-100 min-h-screen p-4 font-sans text-10pt">
       <ReportScreen
+        employees={employees}
         selectedEmployee={selectedEmployee}
+        onEmployeeChange={handleEmployeeChange}
         company={company}
         currentDate={currentDate}
         workRecords={workRecords}
@@ -450,7 +428,7 @@ function App() {
         approvalDate={approvalDate}
         isLoading={isLoading}
         message={message}
-        isReadOnly={!isViewingOwnerReport}
+        isReadOnly={false}
         isReportScreenDirty={isReportScreenDirty}
         onDateChange={handleChangeDate}
         onWorkRecordsChange={setWorkRecords}
@@ -487,7 +465,6 @@ function App() {
       <MasterModal
         isOpen={isMasterModalOpen}
         onRequestClose={() => {
-          refreshOwnerAndAuth();
           setMasterModalOpen(false);
         }}
         onMasterUpdate={handleMasterUpdate}
@@ -496,8 +473,7 @@ function App() {
         companies={companies}
         auth={masterAuthState}
         setAuth={setMasterAuthState}
-        ownerId={ownerId}
-        ownerName={ownerName}
+        employees={employees}
       />
 
       <DailyReportListModal

@@ -190,16 +190,12 @@ def authenticate_master():
 
         # パスワードがハッシュ化されているため、check_password_hashで比較する
         if user and user['password'] and check_password_hash(user['password'], password):
-            # 認証成功後、オーナーIDと一致するかを確認
-            owner_id = get_owner_id()
-            is_owner = int(employee_id) == owner_id
-
-            app.logger.info(f"認証成功: 社員ID={employee_id}, オーナー={is_owner}")
+            app.logger.info(f"認証成功: 社員ID={employee_id}")
 
             return jsonify({
                 "success": True,
                 "message": "認証に成功しました",
-                "is_owner": is_owner
+                "is_owner": True # 誰でもオーナーとして扱う
             }), 200
         else:
             app.logger.warning(f"認証失敗: 社員ID={employee_id}")
@@ -631,12 +627,6 @@ def save_work_records():
         app.logger.warning("作業記録保存API: 不正なリクエストデータです。")
         return jsonify({"error": "無効なデータです"}), 400
 
-    # セキュリティチェック: オーナー以外のユーザーからの更新を防ぐ
-    owner_id = get_owner_id()
-    if employee_id != owner_id:
-        app.logger.warning(f"権限のない作業記録保存試行: 操作対象ID={employee_id}, オーナーID={owner_id}")
-        return jsonify({"error": "作業記録を更新する権限がありません。"}), 403
-
     db = get_db()
     try:
         # 1. 月次レポート（特記事項と月次集計）をUPSERT
@@ -797,11 +787,6 @@ def approve_monthly_report():
     if not all([employee_id, year, month]):
         return jsonify({"error": "無効なデータです"}), 400
 
-    # セキュリティチェック: オーナーのみが承認可能
-    owner_id = get_owner_id()
-    if employee_id != owner_id:
-        return jsonify({"error": "レポートを承認する権限がありません。"}), 403
-
     db = get_db()
     try:
         today_str = datetime.now().strftime('%Y-%m-%d')
@@ -854,11 +839,6 @@ def cancel_approval():
 
     if not all([employee_id, year, month]):
         return jsonify({"error": "無効なデータです"}), 400
-
-    # セキュリティチェック: オーナーのみが承認取り消し可能
-    owner_id = get_owner_id()
-    if employee_id != owner_id:
-        return jsonify({"error": "承認を取り消す権限がありません。"}), 403
 
     db = get_db()
     try:
@@ -1246,117 +1226,38 @@ def save_daily_report():
 # -----------------------------------------------------------------------------
 # APIエンドポイント: 社員マスターメンテナンス
 # -----------------------------------------------------------------------------
-def get_owner_id():
-    """'num.id'ファイルからオーナーのIDを読み込みます。
-
-    このファイルはアプリケーションのルートディレクトリに配置されることを想定しています。
-    ファイルが存在しない、または内容が整数でない場合は、
-    フォールバックとしてデフォルトのID 1を返します。
-
-    Returns:
-        int: オーナーの社員ID。
-    """
-    try:
-        num_id_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'num.id')
-        with open(num_id_path, 'r') as f:
-            owner_id = int(f.read().strip())
-            app.logger.info(f"オーナーID ({owner_id}) を num.id から読み込みました。")
-            return owner_id
-    except (FileNotFoundError, ValueError) as e:
-        app.logger.error(f"num.idファイルの読み込みに失敗しました ({e})。デフォルトのオーナーID(1)を使用します。")
-        return 1
-
-@app.route('/api/owner_info', methods=['GET'])
-def get_owner_info():
-    """オーナーのIDと氏名を取得します。
-
-    Returns:
-        Response: オーナーのIDと氏名を含むJSONレスポンス。
-                  オーナーが見つからない場合は404エラーを返します。
-    """
-    try:
-        owner_id = get_owner_id()
-        db = get_db()
-        cursor = db.execute('SELECT employee_name FROM employees WHERE employee_id = ?', (owner_id,))
-        owner = cursor.fetchone()
-        if owner:
-            return jsonify({"owner_id": owner_id, "owner_name": owner['employee_name']})
-        else:
-            return jsonify({"error": "オーナー情報が見つかりません"}), 404
-    except Exception as e:
-        app.logger.error(f"オーナー情報取得エラー: {e}")
-        return jsonify({"error": "サーバー内部エラー"}), 500
-
-def _get_employee_company_id(employee_id):
-    """ヘルパー関数: 指定された社員IDが所属する会社のIDを取得します。"""
+def is_valid_user(user_id, password):
+    """ヘルパー関数: 提供されたIDとパスワードが正規のユーザーのものであるかを検証します。"""
     try:
         db = get_db()
-        cursor = db.execute('SELECT company_id FROM employees WHERE employee_id = ?', (employee_id,))
-        employee = cursor.fetchone()
-        if employee:
-            return employee['company_id']
-        return None
-    except Exception as e:
-        app.logger.error(f"社員の会社ID取得エラー: {e}")
-        return None
+        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (user_id,))
+        user = cursor.fetchone()
 
-def is_valid_owner(owner_id, password):
-    """ヘルパー関数: 提供されたIDとパスワードが正規のオーナーのものであるかを検証します。
-
-    セキュリティの要となる関数です。
-    1. `get_owner_id()`で取得した真のオーナーIDと、リクエストされた`owner_id`が一致するかを確認します。
-    2. データベースに保存されているハッシュ化されたパスワードと、リクエストされた`password`が一致するかを
-       `check_password_hash`で安全に比較します。
-
-    Args:
-        owner_id (int): 検証するオーナーのID。
-        password (str): 検証するパスワード。
-
-    Returns:
-        bool: IDとパスワードが正規のオーナーのものであればTrue、そうでなければFalse。
-    """
-    try:
-        true_owner_id = get_owner_id()
-        if int(owner_id) != true_owner_id:
-            app.logger.warning(f"オーナー認証失敗: IDの不一致 (要求: {owner_id}, 正: {true_owner_id})")
-            return False
-
-        db = get_db()
-        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (true_owner_id,))
-        owner = cursor.fetchone()
-
-        if owner and owner['password'] and check_password_hash(owner['password'], password):
-            app.logger.info("オーナー認証成功")
+        if user and user['password'] and check_password_hash(user['password'], password):
+            app.logger.info(f"ユーザー認証成功: ID={user_id}")
             return True
         else:
-            app.logger.warning("オーナー認証失敗: パスワードの不一致")
+            app.logger.warning(f"ユーザー認証失敗: ID={user_id}")
             return False
     except Exception as e:
-        app.logger.error(f"オーナー認証中に例外発生: {e}")
+        app.logger.error(f"ユーザー認証中に例外発生: {e}")
         return False
 
 @app.route('/api/employee', methods=['POST'])
 def add_employee():
     """新しい社員を追加します（マスターメンテナンス用）。
 
-    この操作は、リクエストに含まれる認証情報が正規のオーナーのものであり、
-    かつ、追加しようとしている社員の所属会社がオーナー自身の所属会社と同じである
+    この操作は、リクエストに含まれる認証情報が正規のユーザーのものである
     場合にのみ許可されます。
     """
     data = request.json
-    owner_id = data.get('owner_id')
-    owner_password = data.get('owner_password')
-    target_company_id = data.get('company_id')
+    auth_user_id = data.get('auth_user_id')
+    auth_password = data.get('auth_password')
 
-    # セキュリティチェック1: 正規のオーナーか？
-    if not is_valid_owner(owner_id, owner_password):
+    if not is_valid_user(auth_user_id, auth_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
 
-    # セキュリティチェック2: オーナーが所属する会社と、追加対象の社員の会社が同じか？
-    owner_company_id = _get_employee_company_id(owner_id)
-    if not owner_company_id or owner_company_id != target_company_id:
-        app.logger.warning(f"権限のない社員追加試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{target_company_id})の社員を追加しようとしました。")
-        return jsonify({"error": "自分の会社以外の社員は追加できません"}), 403
+    target_company_id = data.get('company_id')
 
     try:
         db = get_db()
@@ -1389,23 +1290,15 @@ def add_employee():
 def update_employee(employee_id):
     """既存の社員情報を更新します（マスターメンテナンス用）。
 
-    この操作は、正規のオーナーであり、かつオーナー自身の会社の社員情報を
-    更新する場合にのみ許可されます。パスワードの更新はこのエンドポイントでは行いません。
+    この操作は、リクエストに含まれる認証情報が正規のユーザーのものである
+    場合にのみ許可されます。パスワードの更新はこのエンドポイントでは行いません。
     """
     data = request.json
-    owner_id = data.get('owner_id')
-    owner_password = data.get('owner_password')
+    auth_user_id = data.get('auth_user_id')
+    auth_password = data.get('auth_password')
 
-    # セキュリティチェック1: 正規のオーナーか？
-    if not is_valid_owner(owner_id, owner_password):
+    if not is_valid_user(auth_user_id, auth_password):
         return jsonify({"error": "この操作を行う権限がありません"}), 403
-
-    # セキュリティチェック2: オーナーと更新対象社員が同じ会社に所属しているか？
-    owner_company_id = _get_employee_company_id(owner_id)
-    target_company_id = _get_employee_company_id(employee_id)
-    if not owner_company_id or owner_company_id != target_company_id:
-        app.logger.warning(f"権限のない更新試行: オーナー(会社ID:{owner_company_id})が別会社(ID:{target_company_id})の社員(ID:{employee_id})を更新しようとしました。")
-        return jsonify({"error": "自分の会社の社員情報のみ更新できます"}), 403
 
     try:
         db = get_db()
