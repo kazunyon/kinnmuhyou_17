@@ -20,19 +20,28 @@ const toJapaneseEra = (date) => {
  * このコンポーネントは状態（state）を持たず、親コンポーネント(App.jsx)から渡された
  * propsを通じて表示と操作を行う「Presentational Component」としての役割を担います。
  * @param {object} props - コンポーネントのプロパティ。
+ * @param {Array<object>} props.employees - 全社員のリスト。
  * @param {object} props.selectedEmployee - 選択中の社員情報。
+ * @param {Function} props.onEmployeeChange - 社員選択が変更されたときのコールバック関数。
  * @param {object} props.company - 選択中の社員が所属する会社情報。
  * @param {Date} props.currentDate - 表示対象の年月。
  * @param {Array<object>} props.workRecords - 1ヶ月分の作業記録。
  * @param {object} props.holidays - 祝日データ。
  * @param {string} props.specialNotes - 月次の特記事項。
+ * @param {object} props.monthlySummary - 月次集計データ。
+ * @param {Array<object>} props.projectSummary - 請求先・案件別集計データ。
+ * @param {string|null} props.approvalDate - 承認日。
  * @param {boolean} props.isLoading - データ読み込み中かを示すフラグ。
  * @param {string} props.message - ユーザーへの通知メッセージ。
+ * @param {boolean} props.isReportScreenDirty - データが変更されているかを示すフラグ。
  * @param {Function} props.onDateChange - 年月が変更されたときのコールバック関数。
  * @param {Function} props.onWorkRecordsChange - 作業記録が変更されたときのコールバック関数。
  * @param {Function} props.onSpecialNotesChange - 特記事項が変更されたときのコールバック関数。
+ * @param {Function} props.onMonthlySummaryChange - 月次集計データが変更されたときのコールバック関数。
  * @param {Function} props.onSave - 保存ボタンクリック時のコールバック関数。
  * @param {Function} props.onPrint - 印刷ボタンクリック時のコールバック関数。
+ * @param {Function} props.onApprove - 承認ボタンクリック時のコールバック関数。
+ * @param {Function} props.onCancelApproval - 承認取り消しボタンクリック時のコールバック関数。
  * @param {Function} props.onOpenDailyReportList - 「日報一覧」ボタンクリック時のコールバック関数。
  * @param {Function} props.onOpenMaster - 「マスター」ボタンクリック時のコールバック関数。
  * @param {Function} props.onRowClick - テーブルの行がクリックされたときのコールバック関数。
@@ -40,7 +49,7 @@ const toJapaneseEra = (date) => {
  */
 const ReportScreen = ({
   employees, selectedEmployee, onEmployeeChange, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
-  projectSummary, // 追加
+  projectSummary,
   approvalDate,
   isLoading, message, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
   onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick

@@ -252,7 +252,15 @@ def get_holidays(year):
 
 @app.route('/api/clients', methods=['GET'])
 def get_clients():
-    """取引先リストを取得します。"""
+    """取引先リストを取得します。
+
+    クエリパラメータ `include_deleted` が `true` の場合、論理削除された
+    取引先も結果に含めます。
+
+    Returns:
+        Response: 取引先オブジェクトのリストを含むJSONレスポンス。
+                  エラーが発生した場合は、エラーメッセージとステータスコード500を返します。
+    """
     include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
@@ -269,7 +277,15 @@ def get_clients():
 
 @app.route('/api/clients', methods=['POST'])
 def add_client():
-    """取引先を追加します。"""
+    """新しい取引先を追加します。
+
+    Request Body (JSON):
+        { "client_name": str }
+
+    Returns:
+        Response: 成功メッセージと新しい取引先IDを含むJSONレスポンス (ステータスコード 201)。
+                  `client_name` がない場合は400、サーバーエラーの場合は500を返します。
+    """
     data = request.json
     client_name = data.get('client_name')
     if not client_name:
@@ -287,10 +303,24 @@ def add_client():
 
 @app.route('/api/clients/<int:client_id>', methods=['PUT'])
 def update_client(client_id):
-    """取引先を更新します。"""
+    """指定された取引先の情報を更新します。
+
+    Args:
+        client_id (int): 更新対象の取引先ID。
+
+    Request Body (JSON):
+        {
+            "client_name": str,
+            "deleted_flag": int (0 or 1)
+        }
+
+    Returns:
+        Response: 成功メッセージを含むJSONレスポンス。
+                  データが無効な場合は400、サーバーエラーの場合は500を返します。
+    """
     data = request.json
     client_name = data.get('client_name')
-    deleted = data.get('deleted_flag', 0)  # フロントエンドは 'deleted_flag' を使用
+    deleted = data.get('deleted_flag', 0)
 
     if not client_name:
         return jsonify({"error": "取引先名は必須です"}), 400
@@ -311,14 +341,17 @@ def update_client(client_id):
 
 @app.route('/api/clients/<int:client_id>', methods=['DELETE'])
 def delete_client(client_id):
-    """取引先を削除（論理削除）します。"""
+    """指定された取引先を論理削除します。
+
+    Args:
+        client_id (int): 論理削除する取引先のID。
+
+    Returns:
+        Response: 成功メッセージを含むJSONレスポンス。
+                  サーバーエラーの場合は500を返します。
+    """
     try:
         db = get_db()
-        # 関連する案件があるか確認（論理削除では不要になる可能性がある）
-        # cursor = db.execute('SELECT count(*) as count FROM projects WHERE client_id = ?', (client_id,))
-        # if cursor.fetchone()['count'] > 0:
-        #     return jsonify({"error": "この取引先に紐づく案件が存在するため削除できません"}), 400
-
         db.execute('UPDATE clients SET deleted = 1 WHERE client_id = ?', (client_id,))
         db.commit()
         return jsonify({"message": "削除しました"}), 200
@@ -329,7 +362,15 @@ def delete_client(client_id):
 
 @app.route('/api/projects', methods=['GET'])
 def get_projects():
-    """案件リストを取得します。"""
+    """案件リストを取得します。
+
+    クエリパラメータ `include_deleted` が `true` の場合、論理削除された
+    案件や取引先も結果に含めます。
+
+    Returns:
+        Response: 案件オブジェクトのリスト（取引先名を含む）を返すJSONレスポンス。
+                  エラーの場合は500を返します。
+    """
     include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
@@ -341,7 +382,6 @@ def get_projects():
         '''
         if not include_deleted:
             query += ' WHERE (p.deleted = 0 OR p.deleted IS NULL) AND (c.deleted = 0 OR c.deleted IS NULL)'
-
         query += ' ORDER BY p.project_id'
 
         cursor = db.execute(query)
@@ -354,7 +394,18 @@ def get_projects():
 
 @app.route('/api/projects', methods=['POST'])
 def add_project():
-    """案件を追加します。"""
+    """新しい案件を追加します。
+
+    Request Body (JSON):
+        {
+            "client_id": int,
+            "project_name": str
+        }
+
+    Returns:
+        Response: 成功メッセージと新しい案件IDを含むJSONレスポンス (ステータスコード 201)。
+                  データが無効な場合は400、サーバーエラーの場合は500を返します。
+    """
     data = request.json
     client_id = data.get('client_id')
     project_name = data.get('project_name')
@@ -373,11 +424,26 @@ def add_project():
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
 def update_project(project_id):
-    """案件を更新します。"""
+    """指定された案件の情報を更新します。
+
+    Args:
+        project_id (int): 更新対象の案件ID。
+
+    Request Body (JSON):
+        {
+            "client_id": int,
+            "project_name": str,
+            "deleted_flag": int (0 or 1)
+        }
+
+    Returns:
+        Response: 成功メッセージを含むJSONレスポンス。
+                  データが無効な場合は400、サーバーエラーの場合は500を返します。
+    """
     data = request.json
     client_id = data.get('client_id')
     project_name = data.get('project_name')
-    deleted = data.get('deleted_flag', 0)  # フロントエンドは 'deleted_flag' を使用
+    deleted = data.get('deleted_flag', 0)
 
     if not client_id or not project_name:
         return jsonify({"error": "取引先と案件名は必須です"}), 400
@@ -398,17 +464,17 @@ def update_project(project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 def delete_project(project_id):
-    """案件を削除（論理削除）します。"""
+    """指定された案件を論理削除します。
+
+    Args:
+        project_id (int): 論理削除する案件のID。
+
+    Returns:
+        Response: 成功メッセージを含むJSONレスポンス。
+                  サーバーエラーの場合は500を返します。
+    """
     try:
         db = get_db()
-        # 関連する作業明細があるか確認 (論理削除では不要になる可能性がある)
-        # try:
-        #     cursor = db.execute('SELECT count(*) as count FROM work_record_details WHERE project_id = ?', (project_id,))
-        #     if cursor.fetchone()['count'] > 0:
-        #         return jsonify({"error": "この案件の使用実績があるため削除できません"}), 400
-        # except sqlite3.OperationalError:
-        #     pass # テーブルがない初期段階は無視
-
         db.execute('UPDATE projects SET deleted = 1 WHERE project_id = ?', (project_id,))
         db.commit()
         return jsonify({"message": "削除しました"}), 200
@@ -1227,7 +1293,15 @@ def save_daily_report():
 # APIエンドポイント: 社員マスターメンテナンス
 # -----------------------------------------------------------------------------
 def is_valid_user(user_id, password):
-    """ヘルパー関数: 提供されたIDとパスワードが正規のユーザーのものであるかを検証します。"""
+    """提供されたIDとパスワードが正規のユーザーのものであるかを検証します。
+
+    Args:
+        user_id (int): 検証するユーザーの社員ID。
+        password (str): 検証するユーザーのパスワード。
+
+    Returns:
+        bool: 認証が成功した場合は True、失敗した場合は False。
+    """
     try:
         db = get_db()
         cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (user_id,))
@@ -1248,7 +1322,22 @@ def add_employee():
     """新しい社員を追加します（マスターメンテナンス用）。
 
     この操作は、リクエストに含まれる認証情報が正規のユーザーのものである
-    場合にのみ許可されます。
+    場合にのみ許可されます。新規社員の初期パスワードは '123' に設定されます。
+
+    Request Body (JSON):
+        {
+            "auth_user_id": int,
+            "auth_password": str,
+            "company_id": int,
+            "employee_name": str,
+            "department_name": str,
+            "employee_type": str,
+            "retirement_flag": bool
+        }
+
+    Returns:
+        Response: 成功メッセージと新しい社員IDを含むJSONレスポンス (ステータスコード 201)。
+                  権限がない場合は403、サーバーエラーの場合は500を返します。
     """
     data = request.json
     auth_user_id = data.get('auth_user_id')
@@ -1263,7 +1352,6 @@ def add_employee():
         db = get_db()
         cursor = db.cursor()
 
-        # 新規社員の初期パスワードは '123' に設定
         password_hash = generate_password_hash('123')
 
         cursor.execute("""
@@ -1292,6 +1380,23 @@ def update_employee(employee_id):
 
     この操作は、リクエストに含まれる認証情報が正規のユーザーのものである
     場合にのみ許可されます。パスワードの更新はこのエンドポイントでは行いません。
+
+    Args:
+        employee_id (int): 更新対象の社員ID。
+
+    Request Body (JSON):
+        {
+            "auth_user_id": int,
+            "auth_password": str,
+            "employee_name": str,
+            "department_name": str,
+            "employee_type": str,
+            "retirement_flag": bool
+        }
+
+    Returns:
+        Response: 成功メッセージを含むJSONレスポンス。
+                  権限がない場合は403、サーバーエラーの場合は500を返します。
     """
     data = request.json
     auth_user_id = data.get('auth_user_id')

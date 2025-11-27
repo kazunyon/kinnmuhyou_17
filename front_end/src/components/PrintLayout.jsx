@@ -13,8 +13,10 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @param {Date} props.currentDate - 表示対象の年月を示すDateオブジェクト。
  * @param {Array<object>} props.workRecords - 1ヶ月分の勤務記録データの配列。
  * @param {object} props.holidays - 祝日データ (キー: 'YYYY-MM-DD', 値: 祝日名)。
+ * @param {string} props.specialNotes - 月次の特記事項。
  * @param {object} props.monthlySummary - 月次集計データ。
- * @param {string} props.approvalDate - 承認日。
+ * @param {Array<object>} props.projectSummary - 請求先・案件別集計データ。
+ * @param {string|null} props.approvalDate - 承認日。
  * @param {React.Ref} ref - `react-to-print`が印刷対象を識別するためのref。
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
