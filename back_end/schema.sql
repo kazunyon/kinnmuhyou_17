@@ -24,8 +24,9 @@ CREATE TABLE employees (
     employee_name TEXT NOT NULL,
     department_name TEXT,
     employee_type TEXT, -- '正社員', 'アルバイト'など
+    role TEXT NOT NULL DEFAULT 'employee', -- 'employee', 'manager', 'accounting'
     retirement_flag INTEGER NOT NULL DEFAULT 0, -- 0:在職, 1:退職
-    password TEXT, -- マスターユーザーのパスワード
+    password TEXT, -- ログイン用パスワード (ハッシュ化済み)
     FOREIGN KEY (company_id) REFERENCES companies (company_id)
 );
 
@@ -86,7 +87,15 @@ CREATE TABLE monthly_reports (
     year INTEGER NOT NULL,
     month INTEGER NOT NULL,
     special_notes TEXT,
-    approval_date TEXT, -- 承認日 (YYYY-MM-DD)
+    approval_date TEXT, -- 互換性のため残存 (最終承認日と同じ扱いとする)
+
+    -- 新しい承認フロー用カラム
+    status TEXT NOT NULL DEFAULT 'draft', -- 'draft', 'submitted', 'approved', 'finalized', 'remanded'
+    submitted_date TEXT, -- 提出日
+    manager_approval_date TEXT, -- 部長承認日
+    accounting_approval_date TEXT, -- 経理完了日
+    remand_reason TEXT, -- 差戻し理由
+
     absent_days INTEGER DEFAULT 0,
     paid_holidays INTEGER DEFAULT 0,
     compensatory_holidays INTEGER DEFAULT 0,

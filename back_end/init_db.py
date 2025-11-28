@@ -46,12 +46,13 @@ def init_db():
 
         # 社員マスター
         # 全てのユーザーに、ハッシュ化された初期パスワード'123'を設定します。
+        # role: 'employee', 'manager', 'accounting'
         employees_definitions = [
-            # (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag)
-            (1, 1, '中村　一真', '開発部', 'アルバイト', 0),
-            (2, 1, '筑紫　哲也', '研究部', '正社員', 0),
-            (3, 1, '営業　よろしく', '営業部', '正社員', 0),
-            (4, 1, '高市　早苗', '開発部', '正社員', 0)
+            # (employee_id, company_id, employee_name, department_name, employee_type, role, retirement_flag)
+            (1, 1, '中村　一真', '開発部', 'アルバイト', 'employee', 0),
+            (2, 1, '筑紫　哲也', '研究部', '正社員', 'manager', 0),
+            (3, 1, '営業　よろしく', '営業部', '正社員', 'employee', 0),
+            (4, 1, '高市　早苗', '経理部', '正社員', 'accounting', 0)
         ]
 
         password_hash = generate_password_hash('123')
@@ -59,8 +60,8 @@ def init_db():
 
         cursor.executemany("""
             INSERT INTO employees
-            (employee_id, company_id, employee_name, department_name, employee_type, retirement_flag, password)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (employee_id, company_id, employee_name, department_name, employee_type, role, retirement_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, employees_data_to_insert)
         print("社員マスターに初期データを挿入しました。")
 
