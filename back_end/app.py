@@ -117,6 +117,36 @@ def login():
         app.logger.error(f"ログインエラー: {e}")
         return jsonify({"error": "サーバー内部エラー"}), 500
 
+@app.route('/api/change_password', methods=['POST'])
+def change_password():
+    """パスワード変更を行います。"""
+    data = request.json
+    employee_id = data.get('employee_id')
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+
+    if not employee_id or not current_password or not new_password:
+        return jsonify({"error": "全ての項目を入力してください"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.execute('SELECT password FROM employees WHERE employee_id = ?', (employee_id,))
+        user = cursor.fetchone()
+
+        if user and user['password'] and check_password_hash(user['password'], current_password):
+            new_password_hash = generate_password_hash(new_password)
+            db.execute('UPDATE employees SET password = ? WHERE employee_id = ?', (new_password_hash, employee_id))
+            db.commit()
+            app.logger.info(f"パスワード変更成功: ID={employee_id}")
+            return jsonify({"success": True, "message": "パスワードを変更しました"}), 200
+        else:
+            app.logger.warning(f"パスワード変更失敗: ID={employee_id} (パスワード不一致)")
+            return jsonify({"error": "現在のパスワードが正しくありません"}), 401
+    except Exception as e:
+        app.logger.error(f"パスワード変更エラー: {e}")
+        db.rollback()
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
 @app.route('/api/logout', methods=['POST'])
 def logout():
     """ログアウト処理を行います。"""
