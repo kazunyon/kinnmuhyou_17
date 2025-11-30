@@ -1099,14 +1099,19 @@ def add_employee():
         db = get_db()
         cursor = db.cursor()
         password_hash = generate_password_hash('123')
+
+        # roleの取得 (デフォルトは employee)
+        role = data.get('role', 'employee')
+
         cursor.execute("""
-            INSERT INTO employees (company_id, employee_name, department_name, employee_type, retirement_flag, password)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO employees (company_id, employee_name, department_name, employee_type, role, retirement_flag, password)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             data.get('company_id'),
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
+            role,
             1 if data.get('retirement_flag') else 0,
             password_hash
         ))
@@ -1125,15 +1130,18 @@ def update_employee(employee_id):
     data = request.json
     try:
         db = get_db()
+
+        # roleの更新も含める
         db.execute("""
             UPDATE employees SET
-            employee_name = ?, department_name = ?, employee_type = ?,
+            employee_name = ?, department_name = ?, employee_type = ?, role = ?,
             retirement_flag = ?
             WHERE employee_id = ?
         """, (
             data.get('employee_name'),
             data.get('department_name'),
             data.get('employee_type'),
+            data.get('role'),
             1 if data.get('retirement_flag') else 0,
             employee_id
         ))

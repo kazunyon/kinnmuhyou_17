@@ -46,7 +46,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
   const [employees, setEmployees] = useState([]);
   const [newEmployee, setNewEmployee] = useState({
       company_id: companies.length > 0 ? companies[0].company_id : '',
-      employee_name: '', department_name: '', employee_type: '正社員'
+      employee_name: '', department_name: '', employee_type: '正社員', role: 'employee'
   });
   const [passwordInput, setPasswordInput] = useState('');
   const [authUserId, setAuthUserId] = useState(selectedEmployeeId);
@@ -113,7 +113,7 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       setNewClientName('');
       setNewEmployee({
         company_id: companies.length > 0 ? companies[0].company_id : '',
-        employee_name: '', department_name: '', employee_type: '正社員'
+        employee_name: '', department_name: '', employee_type: '正社員', role: 'employee'
       });
     }
   }, [isOpen, activeTab, companies]);
@@ -384,7 +384,8 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 <tr>
                     <th className="p-2 border">社員ID</th><th className="p-2 border">企業名</th>
                     <th className="p-2 border">部署名</th><th className="p-2 border">氏名</th>
-                    <th className="p-2 border">社員区分</th><th className="p-2 border">退職</th>
+                    <th className="p-2 border">社員区分</th><th className="p-2 border">権限</th>
+                    <th className="p-2 border">退職</th>
                     <th className="p-2 border">参照</th>
                     <th className="p-2 border">操作</th>
                 </tr>
@@ -404,6 +405,13 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                         <td className="p-2 border" onClick={(e) => e.stopPropagation()}>
                         <select value={emp.employee_type} onChange={(e) => handleInputChange(emp.employee_id, 'employee_type', e.target.value)} className="w-full p-1 border rounded">
                                 <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
+                        </select>
+                        </td>
+                        <td className="p-2 border" onClick={(e) => e.stopPropagation()}>
+                        <select value={emp.role} onChange={(e) => handleInputChange(emp.employee_id, 'role', e.target.value)} className="w-full p-1 border rounded">
+                            <option value="employee">一般</option>
+                            <option value="manager">部長</option>
+                            <option value="accounting">経理</option>
                         </select>
                         </td>
                         <td className="p-2 border text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={!!emp.retirement_flag} onChange={(e) => handleInputChange(emp.employee_id, 'retirement_flag', e.target.checked)} className="h-5 w-5" /></td>
@@ -427,6 +435,13 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                     <td className="p-2 border">
                         <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded">
                             <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
+                        </select>
+                    </td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.role} onChange={(e) => handleNewEmployeeChange('role', e.target.value)} className="w-full p-1 border rounded">
+                            <option value="employee">一般</option>
+                            <option value="manager">部長</option>
+                            <option value="accounting">経理</option>
                         </select>
                     </td>
                     <td className="p-2 border" colSpan="2"></td>
