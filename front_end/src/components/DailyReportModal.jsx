@@ -69,10 +69,18 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
             setProjects(projectsRes.data);
 
             // 時間設定
+            let initialBreakTime = workRecord?.break_time;
+            const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+            const isRestDay = restKeywords.includes((workRecord?.work_content || '').trim());
+
+            if (!initialBreakTime || (initialBreakTime === '00:00' && !isRestDay)) {
+                initialBreakTime = '01:00';
+            }
+
             setTimes({
                 startTime: workRecord?.start_time || '09:00',
                 endTime: workRecord?.end_time || '18:00',
-                breakTime: workRecord?.break_time || '01:00'
+                breakTime: initialBreakTime
             });
 
             // 日報データ取得

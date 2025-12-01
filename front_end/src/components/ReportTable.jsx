@@ -177,7 +177,7 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
               } else if (trimmedContent === '有給') {
                   colorClass = 'bg-blue-200 text-center';
               } else if (trimmedContent === '欠勤') {
-                  colorClass = 'bg-red-200 text-center text-white';
+                  colorClass = 'bg-black text-center text-white';
               } else if (trimmedContent === '休み') {
                   colorClass = 'rest-day-badge text-center'; // 旧「休み」用のクラス
               }
