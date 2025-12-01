@@ -150,12 +150,20 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
             const breakMinutes = timeToMinutes(record.break_time); // ④休憩時間
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes); // ⑤作業時間
 
+            // 明細合計時間の計算 (ディテールとの整合性チェック用)
+            const detailsTotalMinutes = (record.details || []).reduce((sum, d) => sum + (d.work_time || 0), 0);
+            const isTimeMismatch = actualWorkMinutes !== detailsTotalMinutes;
+
             // 行のCSSクラスを動的に決定
             const rowClass =
               selectedRow === i ? 'bg-selected-yellow' : // 選択されている行
               isSunday || isHoliday ? 'bg-holiday-red' : // 日曜または祝日
               isSaturday ? 'bg-saturday-blue' : // 土曜
               ''; // 平日
+
+            // 不整合がある場合のスタイル
+            // 太字かつ赤枠
+            const mismatchStyle = isTimeMismatch ? "font-bold border-2 border-red-600 relative z-10" : "border border-gray-300";
 
             // 作業内容に応じてテキストエリアのクラスを決定するヘルパー関数
             const getTextareaClassName = (content) => {
@@ -179,8 +187,8 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
 
             return (
               <tr key={day} className={rowClass} onClick={() => setSelectedRow(i)} onDoubleClick={() => onRowClick(record)}>
-                <td className="border border-gray-300 p-1">{day}</td>
-                <td className="border border-gray-300 p-1">{weekdays[dayOfWeek]}</td>
+                <td className={`p-1 ${mismatchStyle}`}>{day}</td>
+                <td className={`p-1 ${mismatchStyle}`}>{weekdays[dayOfWeek]}</td>
                 {/* 1列目の作業時間 (⑤と同じ) */}
                 <td className="border border-gray-300 p-1 bg-gray-100">{minutesToTime(actualWorkMinutes)}</td>
                 <td className="border border-gray-300 p-1 text-left align-middle">
