@@ -21,7 +21,9 @@ const modalStyles = {
 };
 
 // アプリケーションのルート要素をモーダルライブラリに設定
-Modal.setAppElement('#root');
+if (typeof document !== 'undefined' && document.getElementById('root')) {
+  Modal.setAppElement('#root');
+}
 
 /**
  * 社員情報、取引先、案件のマスターメンテナンスを行うモーダルコンポーネント。
@@ -391,6 +393,31 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 </tr>
                 </thead>
                 <tbody>
+                {/* 新規社員の追加フォーム */}
+                <tr className="bg-green-50">
+                    <td className="p-2 border">新規</td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded">
+                        {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
+                        </select>
+                    </td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" /></td>
+                    <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" /></td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded">
+                            <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
+                        </select>
+                    </td>
+                    <td className="p-2 border">
+                        <select value={newEmployee.role} onChange={(e) => handleNewEmployeeChange('role', e.target.value)} className="w-full p-1 border rounded">
+                            <option value="employee">一般</option>
+                            <option value="manager">部長</option>
+                            <option value="accounting">経理</option>
+                        </select>
+                    </td>
+                    <td className="p-2 border" colSpan="2"></td>
+                    <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">追加</button></td>
+                </tr>
                 {employees.map(emp => {
                     const companyName = companies.find(c => c.company_id === emp.company_id)?.company_name || 'N/A';
 
@@ -422,31 +449,6 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                     </tr>
                     )
                 })}
-                {/* 新規社員の追加フォーム */}
-                <tr className="bg-green-50">
-                    <td className="p-2 border">新規</td>
-                    <td className="p-2 border">
-                        <select value={newEmployee.company_id} onChange={(e) => handleNewEmployeeChange('company_id', parseInt(e.target.value, 10))} className="w-full p-1 border rounded">
-                        {companies.map(c => <option key={c.company_id} value={c.company_id}>{c.company_name}</option>)}
-                        </select>
-                    </td>
-                    <td className="p-2 border"><input type="text" value={newEmployee.department_name} onChange={(e) => handleNewEmployeeChange('department_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：開発部" /></td>
-                    <td className="p-2 border"><input type="text" value={newEmployee.employee_name} onChange={(e) => handleNewEmployeeChange('employee_name', e.target.value)} className="w-full p-1 border rounded" placeholder="例：鈴木　一郎" /></td>
-                    <td className="p-2 border">
-                        <select value={newEmployee.employee_type} onChange={(e) => handleNewEmployeeChange('employee_type', e.target.value)} className="w-full p-1 border rounded">
-                            <option value="正社員">正社員</option><option value="アルバイト">アルバイト</option><option value="契約社員">契約社員</option>
-                        </select>
-                    </td>
-                    <td className="p-2 border">
-                        <select value={newEmployee.role} onChange={(e) => handleNewEmployeeChange('role', e.target.value)} className="w-full p-1 border rounded">
-                            <option value="employee">一般</option>
-                            <option value="manager">部長</option>
-                            <option value="accounting">経理</option>
-                        </select>
-                    </td>
-                    <td className="p-2 border" colSpan="2"></td>
-                    <td className="p-2 border text-center"><button onClick={handleAdd} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">追加</button></td>
-                </tr>
                 </tbody>
             </table>
             </div>
