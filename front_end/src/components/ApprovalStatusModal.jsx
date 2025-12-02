@@ -18,7 +18,7 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [nameFilter, setNameFilter] = useState('');
+  const [deptFilter, setDeptFilter] = useState('');
   const [hideFinalized, setHideFinalized] = useState(false);
 
   useEffect(() => {
@@ -47,9 +47,9 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
   useEffect(() => {
     let filtered = data;
 
-    if (nameFilter) {
+    if (deptFilter) {
       filtered = filtered.filter(item =>
-        item.employee_name.includes(nameFilter)
+        item.department_name && item.department_name.includes(deptFilter)
       );
     }
 
@@ -58,7 +58,7 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
     }
 
     setFilteredData(filtered);
-  }, [data, nameFilter, hideFinalized]);
+  }, [data, deptFilter, hideFinalized]);
 
   const handleMonthChange = (offset) => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
@@ -144,12 +144,12 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
 
         <div className="flex gap-4 mb-4 items-center bg-gray-50 p-3 rounded">
             <div className="flex items-center">
-                <span className="mr-2 font-bold">部下名検索:</span>
+                <span className="mr-2 font-bold">部名検索:</span>
                 <input
                     type="text"
-                    value={nameFilter}
-                    onChange={(e) => setNameFilter(e.target.value)}
-                    placeholder="氏名を入力..."
+                    value={deptFilter}
+                    onChange={(e) => setDeptFilter(e.target.value)}
+                    placeholder="部署名を入力..."
                     className="border p-1 rounded w-48"
                 />
             </div>
