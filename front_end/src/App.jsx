@@ -8,6 +8,7 @@ import DailyReportListModal from './components/DailyReportListModal';
 import PrintLayout from './components/PrintLayout';
 import LoginScreen from './components/LoginScreen';
 import { useReactToPrint } from 'react-to-print';
+import ApprovalStatusModal from './components/ApprovalStatusModal';
 
 const API_URL = '/api';
 
@@ -50,6 +51,7 @@ function App() {
   const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false);
   const [isMasterModalOpen, setMasterModalOpen] = useState(false);
   const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false);
+  const [isApprovalStatusModalOpen, setApprovalStatusModalOpen] = useState(false);
 
   // マスタ認証状態 (既存のMasterModal用だが、ログインユーザーのRoleチェックに移行していく)
   const [masterAuthState, setMasterAuthState] = useState({
@@ -376,8 +378,18 @@ function App() {
   return (
     <div className="bg-gray-100 min-h-screen p-4 font-sans text-10pt">
       {/* ログイン情報表示とログアウト */}
-      <div className="flex justify-between items-center mb-2 px-4">
-        <div>ログイン中: {user.employee_name} ({user.role === 'employee' ? '社員' : user.role === 'manager' ? '部長' : '経理'})</div>
+      <div className="flex justify-between items-center mb-2 px-4 bg-white p-2 rounded shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="font-bold text-gray-700">ログイン中: {user.employee_name} ({user.role === 'employee' ? '社員' : user.role === 'manager' ? '部長' : '経理'})</div>
+          {(user.role === 'manager' || user.role === 'accounting') && (
+            <button
+              onClick={() => setApprovalStatusModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1 rounded shadow"
+            >
+              承認状況表
+            </button>
+          )}
+        </div>
         <button onClick={handleLogout} className="text-sm text-blue-600 hover:underline">ログアウト</button>
       </div>
 
@@ -467,6 +479,12 @@ function App() {
         employeeId={selectedEmployeeId}
         year={currentDate.getFullYear()}
         month={currentDate.getMonth() + 1}
+      />
+
+      <ApprovalStatusModal
+        isOpen={isApprovalStatusModalOpen}
+        onRequestClose={() => setApprovalStatusModalOpen(false)}
+        initialDate={currentDate}
       />
       
       <div style={{ visibility: 'hidden', height: 0, overflow: 'hidden' }}>

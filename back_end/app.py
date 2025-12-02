@@ -810,6 +810,43 @@ def finalize_monthly_report():
         db.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/monthly_reports/overview/<int:year>/<int:month>', methods=['GET'])
+@login_required
+def get_monthly_reports_overview(year, month):
+    # 権限チェック
+    if session.get('role') not in ['manager', 'accounting']:
+        return jsonify({"error": "権限がありません"}), 403
+
+    try:
+        db = get_db()
+        # 退職していない社員を取得し、指定月のレポート状況と結合
+        query = """
+            SELECT
+                e.employee_id,
+                e.employee_name,
+                e.department_name,
+                COALESCE(r.status, 'draft') as status,
+                r.submitted_date,
+                r.manager_approval_date,
+                r.accounting_approval_date,
+                r.remand_reason
+            FROM employees e
+            LEFT JOIN monthly_reports r
+              ON e.employee_id = r.employee_id
+              AND r.year = ?
+              AND r.month = ?
+            WHERE e.retirement_flag = 0
+            ORDER BY e.employee_id
+        """
+        cursor = db.execute(query, (year, month))
+        overview = [dict(row) for row in cursor.fetchall()]
+
+        return jsonify(overview)
+
+    except Exception as e:
+        app.logger.error(f"承認状況取得エラー: {e}")
+        return jsonify({"error": "サーバー内部エラー"}), 500
+
 @app.route('/api/monthly_reports/cancel_approval', methods=['POST'])
 @login_required
 def cancel_approval():
