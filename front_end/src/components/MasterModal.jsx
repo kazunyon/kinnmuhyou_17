@@ -13,7 +13,8 @@ const modalStyles = {
     top: '50%', left: '50%', right: 'auto', bottom: 'auto',
     marginRight: '-50%', transform: 'translate(-50%, -50%)',
     width: '1000px',
-    maxHeight: '90vh', padding: '2rem'
+    maxHeight: '90vh', padding: '2rem',
+    display: 'flex', flexDirection: 'column'
   },
   overlay: {
     backgroundColor: 'rgba(0, 0, 0, 0.75)'
@@ -337,10 +338,10 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
 
   return (
     <Modal isOpen={isOpen} onRequestClose={onRequestClose} style={modalStyles} contentLabel="マスターメンテナンス">
-      <h2 className="text-xl font-bold text-center mb-6">マスターメンテナンス</h2>
+      <h2 className="text-xl font-bold text-center mb-6 flex-shrink-0">マスターメンテナンス</h2>
 
       {/* --- タブ切り替え --- */}
-      <div className="flex space-x-4 mb-6 border-b">
+      <div className="flex space-x-4 mb-6 border-b flex-shrink-0">
         <button
           className={`py-2 px-4 ${activeTab === 'employees' ? 'border-b-2 border-blue-500 font-bold' : ''}`}
           onClick={() => setActiveTab('employees')}>
@@ -359,9 +360,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       </div>
 
       {activeTab === 'employees' && (
-        <>
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         {/* --- 認証エリア --- */}
-        <div className="bg-gray-100 p-4 rounded-lg mb-6 border">
+        <div className="bg-gray-100 p-4 rounded-lg mb-6 border flex-shrink-0">
             <h3 className="text-lg font-semibold mb-3">編集認証</h3>
             <div className="flex items-center space-x-4">
                 <fieldset disabled={auth.isAuthenticated} className="flex items-center space-x-4">
@@ -379,10 +380,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
         </div>
 
         {/* --- 社員情報エリア --- */}
-        <div className={!auth.isAuthenticated ? 'opacity-50 pointer-events-none' : ''}>
-            <div className="overflow-y-auto" style={{maxHeight: '50vh'}}>
+        <div className={`${!auth.isAuthenticated ? 'opacity-50 pointer-events-none' : ''} flex-1 overflow-y-auto min-h-0`}>
             <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-200 sticky top-0">
+                <thead className="bg-gray-200 sticky top-0 z-10">
                 <tr>
                     <th className="p-2 border">社員ID</th><th className="p-2 border">企業名</th>
                     <th className="p-2 border">部署名</th><th className="p-2 border">氏名</th>
@@ -451,20 +451,20 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
                 })}
                 </tbody>
             </table>
-            </div>
         </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'clients' && (
-        <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
-          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2 flex-shrink-0">
             <span className="font-bold">新規追加:</span>
             <input type="text" placeholder="取引先名" className="p-1 border rounded flex-grow" value={newClientName} onChange={(e) => setNewClientName(e.target.value)} />
             <button onClick={handleClientAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
           </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-200 sticky top-0">
+            <thead className="bg-gray-200 sticky top-0 z-10">
               <tr>
                 <th className="p-2 border w-20">ID</th>
                 <th className="p-2 border">取引先名</th>
@@ -502,12 +502,13 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
       {activeTab === 'projects' && (
-        <div className="overflow-y-auto" style={{maxHeight: '60vh'}}>
-          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="mb-4 p-2 bg-blue-50 border rounded flex items-center space-x-2 flex-shrink-0">
             <span className="font-bold">新規追加:</span>
             <select className="p-1 border rounded" value={newProject.client_id} onChange={(e) => setNewProject(prev => ({ ...prev, client_id: parseInt(e.target.value, 10) }))}>
               {clients.filter(c => c.deleted !== 1).map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
@@ -515,15 +516,16 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
             <input type="text" placeholder="案件名" className="p-1 border rounded flex-grow" value={newProject.project_name} onChange={(e) => setNewProject(prev => ({ ...prev, project_name: e.target.value }))} />
             <button onClick={handleProjectAdd} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700">追加</button>
           </div>
-          <div className="mb-4 flex items-center space-x-2">
+          <div className="mb-4 flex items-center space-x-2 flex-shrink-0">
             <span className="font-bold">取引先で絞り込み:</span>
             <select className="p-1 border rounded" value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}>
               <option value="all">すべて</option>
               {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
             </select>
           </div>
+          <div className="flex-1 overflow-y-auto min-h-0">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-200 sticky top-0">
+            <thead className="bg-gray-200 sticky top-0 z-10">
               <tr>
                 <th className="p-2 border w-20">ID</th>
                 <th className="p-2 border w-48">取引先</th>
@@ -571,10 +573,11 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
-      <div className="flex justify-end mt-6">
+      <div className="flex justify-end mt-6 flex-shrink-0">
         <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       </div>
     </Modal>
