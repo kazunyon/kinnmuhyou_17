@@ -171,6 +171,7 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-100 sticky top-0 z-10">
                         <tr>
+                            <th className="p-3 border-b font-bold w-20">ID</th>
                             <th className="p-3 border-b font-bold w-1/4">氏名 (部署)</th>
                             <th className="p-3 border-b font-bold w-1/2">進捗状況 (下書き → 提出 → 承認 → 完了)</th>
                             <th className="p-3 border-b font-bold w-1/4">最終更新日 / 備考</th>
@@ -178,10 +179,13 @@ const ApprovalStatusModal = ({ isOpen, onRequestClose, initialDate }) => {
                     </thead>
                     <tbody>
                         {filteredData.length === 0 ? (
-                             <tr><td colSpan="3" className="p-4 text-center text-gray-500">該当するデータがありません</td></tr>
+                             <tr><td colSpan="4" className="p-4 text-center text-gray-500">該当するデータがありません</td></tr>
                         ) : (
                             filteredData.map(item => (
                                 <tr key={item.employee_id} className="hover:bg-gray-50">
+                                    <td className="p-3 border-b font-bold text-gray-600 text-center">
+                                        {item.employee_id}
+                                    </td>
                                     <td className="p-3 border-b">
                                         <div className="font-bold text-gray-800">{item.employee_name}</div>
                                         <div className="text-xs text-gray-500">{item.department_name || '-'}</div>
