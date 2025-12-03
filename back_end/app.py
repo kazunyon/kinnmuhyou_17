@@ -492,7 +492,8 @@ def get_work_records(employee_id, year, month):
                 "total_hours": f"{truncated_hours:.2f}",
                 "total_minutes": round(total_minutes)
             })
-        project_summary.sort(key=lambda x: (x['client_name'], x['project_name']))
+        # 取引先名 > 案件名 の順で昇順ソート
+        project_summary.sort(key=lambda x: (str(x['client_name']), str(x['project_name'])))
 
         # 月次レポート情報取得 (新しいカラムを含む)
         report_cursor = db.execute("""
