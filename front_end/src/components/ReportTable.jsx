@@ -168,8 +168,14 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
             // 作業内容に応じてテキストエリアのクラスを決定するヘルパー関数
             const getTextareaClassName = (content) => {
               const baseClass = "w-full h-full p-1 border-none resize-none min-h-[40px]";
-              const readOnlyClass = isReadOnly ? ' bg-gray-100' : '';
               const trimmedContent = (content || '').trim();
+
+              // 特殊なステータスかどうかを判定
+              const isSpecialStatus = ['代休', '振休', '有給', '欠勤', '休み'].includes(trimmedContent);
+
+              // 読み取り専用の場合、特殊なステータスでなければグレー背景にする
+              // 特殊なステータスの場合は、読み取り専用でも本来の色（青や黒など）を優先して表示する
+              const readOnlyClass = (isReadOnly && !isSpecialStatus) ? ' bg-gray-100' : '';
 
               let colorClass = 'bg-transparent';
               if (['代休', '振休'].includes(trimmedContent)) {
