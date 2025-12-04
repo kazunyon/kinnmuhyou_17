@@ -120,7 +120,7 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
           <tr className="bg-gray-200">
             <th className="border border-gray-300 p-1 w-[40px]">日付</th>
             <th className="border border-gray-300 p-1 w-[40px]">曜日</th>
-            <th className="border border-gray-300 p-1 w-[80px]">合計作業時間</th>
+            <th className="border border-gray-300 p-1 w-[80px]">合計<br/>作業時間</th>
             <th className="border border-gray-300 p-1">
                <div className="flex justify-between items-center px-2">
                  <span>作業内容</span>
@@ -215,20 +215,21 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
                          ))}
                       </select>
                       {/* 作業詳細 */}
-                      <input
-                         type="text"
+                      <textarea
                          value={detail.description || ''}
                          onChange={(e) => handleDetailChange(i, idx, 'description', e.target.value)}
                          className="border rounded text-xs p-1 flex-grow min-w-[100px]"
                          placeholder="具体的な作業を入力してください"
                          disabled={isReadOnly}
+                         rows={1}
+                         style={{ resize: 'vertical' }}
                       />
                       {/* 個別作業時間 */}
                       <input
                          type="time"
                          value={minutesToTime(detail.work_time)}
                          onChange={(e) => handleDetailChange(i, idx, 'work_time_str', e.target.value)}
-                         className="border rounded text-xs p-1 w-[60px]"
+                         className="border rounded text-xs p-1 w-[80px]"
                          disabled={isReadOnly}
                       />
                       {/* 削除ボタン */}
