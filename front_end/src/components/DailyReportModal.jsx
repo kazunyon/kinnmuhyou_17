@@ -351,7 +351,7 @@ ${reportData.thoughts}`;
                                 </select>
                             </td>
                             <td className="p-2 border">
-                                <input type="text" className="w-full p-1 border rounded" value={detail.description || ''} onChange={(e) => handleDetailChange(index, 'description', e.target.value)} />
+                                <AutoResizeTextarea className="w-full p-1 border rounded" value={detail.description || ''} onChange={(e) => handleDetailChange(index, 'description', e.target.value)} />
                             </td>
                             <td className="p-2 border">
                                 <input type="number" className="w-full p-1 border rounded text-right" value={detail.work_time} onChange={(e) => handleDetailChange(index, 'work_time', parseInt(e.target.value) || 0)} step="15" />
@@ -416,5 +416,30 @@ const TextAreaField = ({ label, value, onChange, rows }) => (
       />
     </div>
 );
+
+/**
+ * 入力内容に応じて高さを自動調整するテキストエリア。
+ */
+const AutoResizeTextarea = ({ value, onChange, className }) => {
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={onChange}
+      rows={1}
+      className={`resize-none overflow-hidden ${className}`}
+      style={{ minHeight: '34px', lineHeight: '1.5' }}
+    />
+  );
+};
 
 export default DailyReportModal;
