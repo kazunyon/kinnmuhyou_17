@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Modal from 'react-modal';
 import axios from 'axios';
 
@@ -16,6 +16,7 @@ const modalStyles = {
   },
   overlay: {
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    zIndex: 1000,
   },
 };
 
@@ -43,43 +44,67 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
+
+
   // --- 明細関連の状態管理 ---
   const [details, setDetails] = useState([]);
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
   const [totalDetailTime, setTotalDetailTime] = useState(0);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
 
+  // --- データ取得 ---
   useEffect(() => {
-    const fetchMasters = async () => {
-      try {
-        const [clientsRes, projectsRes] = await Promise.all([
-          axios.get(`${API_URL}/clients`),
-          axios.get(`${API_URL}/projects`)
-        ]);
-        setClients(clientsRes.data);
-        setProjects(projectsRes.data);
-      } catch (error) {
-        console.error("マスタ取得エラー:", error);
-      }
+    if (!isOpen) return;
+
+    const fetchAllData = async () => {
+        try {
+            // マスターデータ取得
+            const params = { include_deleted: includeDeleted };
+            const [clientsRes, projectsRes] = await Promise.all([
+                axios.get(`${API_URL}/clients`, { params }),
+                axios.get(`${API_URL}/projects`, { params })
+            ]);
+            setClients(clientsRes.data);
+            setProjects(projectsRes.data);
+
+            // 時間設定
+            let initialBreakTime = workRecord?.break_time;
+            const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+            const isRestDay = restKeywords.includes((workRecord?.work_content || '').trim());
+
+            if (!initialBreakTime || (initialBreakTime === '00:00' && !isRestDay)) {
+                initialBreakTime = '01:00';
+            }
+
+            setTimes({
+                startTime: workRecord?.start_time || '09:00',
+                endTime: workRecord?.end_time || '18:00',
+                breakTime: initialBreakTime
+            });
+
+            // 日報データ取得
+            const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
+            const initialReportText = {
+                work_summary: workRecord?.work_content || '',
+                problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
+            };
+            setReportData(response.data ? { ...initialReportText, ...response.data } : initialReportText);
+
+            // 明細設定
+            const initialDetails = workRecord?.details?.map(d => ({
+                client_id: d.client_id, project_id: d.project_id, work_time: d.work_time, description: d.description || ''
+            })) || [];
+            setDetails(initialDetails);
+
+        } catch (error) {
+            console.error("日報データの読み込みに失敗しました:", error);
+        } finally {
+            // 全ての初期データセットが完了したことをマーク
+        }
     };
-    if (isOpen) fetchMasters();
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (isOpen && workRecord) {
-      // 既存の明細があればセットする (workRecordにdetailsが含まれている前提)
-      if (workRecord.details && workRecord.details.length > 0) {
-        setDetails(workRecord.details.map(d => ({
-          client_id: d.client_id,
-          project_id: d.project_id,
-          work_time: d.work_time
-        })));
-      } else {
-        // 新規または明細なし
-        setDetails([]);
-      }
-    }
-  }, [isOpen, workRecord]);
+    fetchAllData();
+  }, [isOpen, employeeId, date, workRecord, includeDeleted]);
 
   // 明細合計時間の計算
   useEffect(() => {
@@ -87,39 +112,6 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     setTotalDetailTime(total);
   }, [details]);
 
-
-  /**
-   * モーダルが開いたとき、または主要なpropが変更されたときに日報データを取得します。
-   * 親から渡された作業記録を基に時間と作業内容を初期設定し、
-   * その他の日報項目はAPIからフェッチします。
-   */
-  useEffect(() => {
-    if (isOpen && employeeId && date) {
-      setTimes({
-          startTime: workRecord?.start_time || '09:00',
-          endTime: workRecord?.end_time || '18:00',
-          breakTime: workRecord?.break_time || '01:00'
-      });
-      
-      const fetchReport = async () => {
-        try {
-          const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
-          const initialData = {
-              work_summary: workRecord?.work_content || '',
-              problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
-          };
-          if (response.data) {
-            setReportData({ ...initialData, ...response.data });
-          } else {
-            setReportData(initialData);
-          }
-        } catch (error) {
-          console.error("日報データの取得に失敗しました:", error);
-        }
-      };
-      fetchReport();
-    }
-  }, [isOpen, employeeId, date, workRecord]);
 
   /**
    * 時間選択の変更をハンドリングし、stateを更新します。
@@ -142,14 +134,16 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
    */
   const handleDataChange = (field, value) => {
     setReportData(prev => ({ ...prev, [field]: value }));
-    if (field === 'work_summary' && value.trim() === '休み') {
+
+    const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+    if (field === 'work_summary' && restKeywords.includes(value.trim())) {
       setTimes({ startTime: '00:00', endTime: '00:00', breakTime: '00:00' });
     }
   };
 
   // --- 明細操作ハンドラ ---
   const handleAddDetail = () => {
-    setDetails([...details, { client_id: '', project_id: '', work_time: 0 }]);
+    setDetails([...details, { client_id: '', project_id: '', work_time: 0, description: '' }]);
   };
 
   const handleRemoveDetail = (index) => {
@@ -178,51 +172,6 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
     return Math.max(0, duration);
   };
 
-  /**
-   * 「適用して閉じる」ボタンのハンドラ。
-   * 日報データをDBに保存し、親コンポーネントに変更を通知してからモーダルを閉じます。
-   */
-  const handleApplyAndClose = async () => {
-    // 時間チェック
-    const workDuration = calculateWorkDuration();
-    if (Math.abs(workDuration - totalDetailTime) > 0 && details.length > 0) {
-        if (!window.confirm(`作業明細の合計(${totalDetailTime}分)と実働時間(${workDuration}分)が一致していません。保存しますか？`)) {
-            return;
-        }
-    }
-
-    try {
-      await axios.post(`${API_URL}/daily_report`, {
-        employee_id: employeeId,
-        date: date,
-        ...reportData,
-        start_time: times.startTime,
-        end_time: times.endTime,
-        break_time: times.breakTime,
-        details: details // 明細も送信
-      });
-
-      // 親への通知: work_contentはサーバー側で生成されるが、即時反映のために
-      // クライアント側でも簡易生成して渡すか、リロードを促すフラグを立てる
-      // ここでは簡易生成はせず、リロードを促すためコールバックには主要データのみ渡す
-      // (App.jsx側で再取得処理が走るように onReportUpdate(true) を呼んでいるのでOK)
-
-      onSave({
-          day: new Date(date).getDate(),
-          start_time: times.startTime,
-          end_time: times.endTime,
-          break_time: times.breakTime,
-          work_content: reportData.work_summary, // テキストエリアの値を優先表示、またはサーバー生成値を待つなら空でも
-          details: details // クライアント反映用
-      });
-
-      onReportUpdate(true);
-      onRequestClose();
-    } catch (error) {
-      console.error("日報データの保存に失敗しました:", error);
-      alert("日報データの保存に失敗しました。");
-    }
-  };
 
   /**
    * 「日報ポスト」ボタンのハンドラ。
@@ -282,11 +231,45 @@ ${reportData.thoughts}`;
    * アクションボタン群をレンダリングするための変数。
    * @type {JSX.Element}
    */
+  const handleSaveAndClose = async () => {
+    let finalTimes = { ...times };
+    const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
+    if (restKeywords.includes(reportData.work_summary.trim())) {
+      finalTimes = { startTime: '00:00', endTime: '00:00', breakTime: '00:00' };
+    }
+
+    try {
+      await axios.post(`${API_URL}/daily_report`, {
+        employee_id: employeeId,
+        date: date,
+        ...reportData,
+        start_time: finalTimes.startTime,
+        end_time: finalTimes.endTime,
+        break_time: finalTimes.breakTime,
+        details: details
+      });
+
+      onSave({
+          day: new Date(date).getDate(),
+          start_time: finalTimes.startTime,
+          end_time: finalTimes.endTime,
+          break_time: finalTimes.breakTime,
+          work_content: reportData.work_summary,
+          details: details
+      });
+      onReportUpdate(true);
+      onRequestClose();
+    } catch (error) {
+      console.error("日報データの保存に失敗しました:", error);
+      alert("日報データの保存に失敗しました。");
+    }
+  };
+
   const actionButtons = (
-    <div className="flex justify-end space-x-4">
+    <div className="flex justify-end items-center space-x-4">
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-      <button onClick={handleApplyAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
+      <button onClick={handleSaveAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
     </div>
   );
 
@@ -327,7 +310,17 @@ ${reportData.thoughts}`;
           {/* 作業明細入力 */}
           <div className="p-4 border rounded w-full mt-4 bg-blue-50">
             <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold">作業内訳 (ディテール)</h3>
+                <div className="flex items-center space-x-4">
+                    <h3 className="font-bold">作業内訳 (ディテール)</h3>
+                    <label className="flex items-center space-x-2 text-sm">
+                        <input
+                            type="checkbox"
+                            checked={includeDeleted}
+                            onChange={(e) => setIncludeDeleted(e.target.checked)}
+                        />
+                        <span>削除済みを表示</span>
+                    </label>
+                </div>
                 <button onClick={handleAddDetail} className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">+ 行追加</button>
             </div>
             <table className="w-full bg-white border">
@@ -335,6 +328,7 @@ ${reportData.thoughts}`;
                     <tr className="bg-gray-100">
                         <th className="p-2 border w-40">取引先</th>
                         <th className="p-2 border">案件</th>
+                        <th className="p-2 border">作業詳細</th>
                         <th className="p-2 border w-32">時間(分)</th>
                         <th className="p-2 border w-16"></th>
                     </tr>
@@ -345,16 +339,19 @@ ${reportData.thoughts}`;
                             <td className="p-2 border">
                                 <select className="w-full p-1 border rounded" value={detail.client_id} onChange={(e) => handleDetailChange(index, 'client_id', parseInt(e.target.value))}>
                                     <option value="">選択...</option>
-                                    {clients.map(c => <option key={c.client_id} value={c.client_id}>{c.client_name}</option>)}
+                                    {clients.map(c => <option key={c.client_id} value={c.client_id} className={c.deleted ? 'text-red-500' : ''}>{c.client_name}</option>)}
                                 </select>
                             </td>
                             <td className="p-2 border">
                                 <select className="w-full p-1 border rounded" value={detail.project_id} onChange={(e) => handleDetailChange(index, 'project_id', parseInt(e.target.value))} disabled={!detail.client_id}>
                                     <option value="">選択...</option>
                                     {projects.filter(p => p.client_id === detail.client_id).map(p => (
-                                        <option key={p.project_id} value={p.project_id}>{p.project_name}</option>
+                                        <option key={p.project_id} value={p.project_id} className={p.deleted ? 'text-red-500' : ''}>{p.project_name}</option>
                                     ))}
                                 </select>
+                            </td>
+                            <td className="p-2 border">
+                                <input type="text" className="w-full p-1 border rounded" value={detail.description || ''} onChange={(e) => handleDetailChange(index, 'description', e.target.value)} />
                             </td>
                             <td className="p-2 border">
                                 <input type="number" className="w-full p-1 border rounded text-right" value={detail.work_time} onChange={(e) => handleDetailChange(index, 'work_time', parseInt(e.target.value) || 0)} step="15" />
@@ -364,11 +361,11 @@ ${reportData.thoughts}`;
                             </td>
                         </tr>
                     ))}
-                    {details.length === 0 && <tr><td colSpan="4" className="p-2 text-center text-gray-500">明細なし</td></tr>}
+                    {details.length === 0 && <tr><td colSpan="5" className="p-2 text-center text-gray-500">明細なし</td></tr>}
                 </tbody>
                 <tfoot>
                     <tr className="bg-gray-100 font-bold">
-                        <td colSpan="2" className="p-2 text-right border">合計</td>
+                        <td colSpan="3" className="p-2 text-right border">合計</td>
                         <td className="p-2 text-right border">{Math.floor(totalDetailTime / 60)}h {totalDetailTime % 60}m</td>
                         <td className="border"></td>
                     </tr>
@@ -383,7 +380,7 @@ ${reportData.thoughts}`;
 
           {/* テキストエリア */}
           <div className="space-y-4 p-4 border rounded mt-4 w-full">
-            <TextAreaField label="作業内容 (明細から自動生成されますが、手動編集も可能です)" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
+            <TextAreaField label="作業内容" value={reportData.work_summary} onChange={(e) => handleDataChange('work_summary', e.target.value)} rows={4} />
             <TextAreaField label="問題点" value={reportData.problems} onChange={(e) => handleDataChange('problems', e.target.value)} rows={2} />
             <TextAreaField label="課題" value={reportData.challenges} onChange={(e) => handleDataChange('challenges', e.target.value)} rows={2} />
             <TextAreaField label="明日する内容" value={reportData.tomorrow_tasks} onChange={(e) => handleDataChange('tomorrow_tasks', e.target.value)} rows={2} />

@@ -1,8 +1,24 @@
 import React from 'react';
 
+/**
+ * 日報一覧を印刷するためのレイアウトコンポーネント。
+ * このコンポーネントは `react-to-print` から使用されることを想定しており、
+ * 画面上には表示されず、印刷時のみレンダリングされます。
+ * @param {object} props - コンポーネントのプロパティ。
+ * @param {Array<object>} props.reports - 印刷する日報データの配列。
+ * @param {number} props.year - 対象の年。
+ * @param {number} props.month - 対象の月。
+ * @param {React.Ref} ref - `react-to-print` が印刷対象を識別するためのref。
+ * @returns {JSX.Element|null} 印刷用のレイアウトを持つJSX要素、またはレポートがない場合はnull。
+ */
 const DailyReportListPrint = React.forwardRef((props, ref) => {
   const { reports, year, month } = props;
 
+  /**
+   * レポートデータに基づいてテーブル行のCSSクラス名を返します。
+   * @param {object} report - 表示するレポートオブジェクト。
+   * @returns {string} Tailwind CSSのクラス名。
+   */
   const getRowClassName = (report) => {
     if (report.isHoliday || report.dayOfWeek === '日') {
       return 'bg-red-100 align-top';

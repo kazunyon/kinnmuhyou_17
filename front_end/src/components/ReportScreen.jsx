@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import ReportTable from './ReportTable';
 
 /**
@@ -10,47 +11,26 @@ const toJapaneseEra = (date) => {
   if (year >= 2019) {
     return `令和${year - 2018}年`;
   }
-  // 他の元号が必要な場合はここに追加
   return `${year}年`;
 };
 
 /**
  * 作業報告書のメイン画面UIを提供するコンポーネント。
- * ヘッダー、社員情報、作業報告テーブル、特記事項欄で構成されます。
- * このコンポーネントは状態（state）を持たず、親コンポーネント(App.jsx)から渡された
- * propsを通じて表示と操作を行う「Presentational Component」としての役割を担います。
- * @param {object} props - コンポーネントのプロパティ。
- * @param {object} props.selectedEmployee - 選択中の社員情報。
- * @param {object} props.company - 選択中の社員が所属する会社情報。
- * @param {Date} props.currentDate - 表示対象の年月。
- * @param {Array<object>} props.workRecords - 1ヶ月分の作業記録。
- * @param {object} props.holidays - 祝日データ。
- * @param {string} props.specialNotes - 月次の特記事項。
- * @param {boolean} props.isLoading - データ読み込み中かを示すフラグ。
- * @param {string} props.message - ユーザーへの通知メッセージ。
- * @param {boolean} props.isReadOnly - 表示が読み取り専用かを示すフラグ。
- * @param {Function} props.onDateChange - 年月が変更されたときのコールバック関数。
- * @param {Function} props.onWorkRecordsChange - 作業記録が変更されたときのコールバック関数。
- * @param {Function} props.onSpecialNotesChange - 特記事項が変更されたときのコールバック関数。
- * @param {Function} props.onSave - 保存ボタンクリック時のコールバック関数。
- * @param {Function} props.onPrint - 印刷ボタンクリック時のコールバック関数。
- * @param {Function} props.onOpenDailyReportList - 「日報一覧」ボタンクリック時のコールバック関数。
- * @param {Function} props.onOpenMaster - 「マスター」ボタンクリック時のコールバック関数。
- * @param {Function} props.onRowClick - テーブルの行がクリックされたときのコールバック関数。
- * @returns {JSX.Element} レンダリングされた作業報告書スクリーン。
  */
 const ReportScreen = ({
-  selectedEmployee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
-  projectSummary, // 追加
-  approvalDate,
-  isLoading, message, isReadOnly, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
-  onSave, onPrint, onApprove, onCancelApproval, onOpenDailyReportList, onOpenMaster, onRowClick
+  employees, selectedEmployee, onEmployeeChange, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,
+  projectSummary,
+  approvalDate, // 互換用
+  status, submittedDate, managerApprovalDate, accountingApprovalDate, remandReason,
+  user,
+  isLoading, message, isReportScreenDirty, onDateChange, onWorkRecordsChange, onSpecialNotesChange, onMonthlySummaryChange,
+  onSave, onPrint,
+  onSubmitReport, onApproveReport, onRemandReport, onFinalizeReport, onCancelStatus,
+  onOpenDailyReportList, onOpenMaster, onRowClick, clients, projects
 }) => {
+  const [remandModalOpen, setRemandModalOpen] = useState(false);
+  const [remandReasonInput, setRemandReasonInput] = useState('');
 
-  /**
-   * 年選択プルダウンの変更をハンドリングします。
-   * @param {React.ChangeEvent<HTMLSelectElement>} e - イベントオブジェクト。
-   */
   const handleYearChange = (e) => {
     const newYear = parseInt(e.target.value, 10);
     const newDate = new Date(currentDate);
@@ -58,10 +38,6 @@ const ReportScreen = ({
     onDateChange(newDate);
   };
 
-  /**
-   * 月選択プルダウンの変更をハンドリングします。
-   * @param {React.ChangeEvent<HTMLSelectElement>} e - イベントオブジェクト。
-   */
   const handleMonthChange = (e) => {
     const newMonth = parseInt(e.target.value, 10);
     const newDate = new Date(currentDate);
@@ -69,54 +45,155 @@ const ReportScreen = ({
     onDateChange(newDate);
   };
   
-  /**
-   * 年月プルダウン用の選択肢配列。
-   * @type {{years: number[], months: number[]}}
-   */
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
   const months = Array.from({ length: 12 }, (_, i) => i);
 
+  // 権限とステータスに基づくUI制御
+  const isEmployee = user?.role === 'employee';
+  const isManager = user?.role === 'manager';
+  const isAccounting = user?.role === 'accounting';
+  const isSelf = user?.employee_id === selectedEmployee?.employee_id;
+
+  // 編集可能かどうか: 本人 かつ (draft または remanded)
+  const isEditable = isSelf && (status === 'draft' || status === 'remanded');
+
+  // ステータスバッジの色
+  const getStatusBadge = () => {
+    switch(status) {
+      case 'draft': return <span className="bg-gray-200 text-gray-800 px-2 py-1 rounded text-sm">下書き</span>;
+      case 'submitted': return <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">提出済</span>;
+      case 'approved': return <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">部長承認済</span>;
+      case 'finalized': return <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-sm">完了</span>;
+      case 'remanded': return <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-sm">差戻し</span>;
+      default: return null;
+    }
+  };
+
+  const handleRemandSubmit = () => {
+    onRemandReport(remandReasonInput);
+    setRemandModalOpen(false);
+    setRemandReasonInput('');
+  };
+
   return (
-    <div className="container mx-auto p-4 bg-white shadow-lg rounded-lg">
-      <header className="grid grid-cols-3 items-center mb-4">
-        {/* 年月選択 */}
-        <div className="flex items-center space-x-2">
-           <select value={currentDate.getFullYear()} onChange={handleYearChange} className="p-1 border rounded">
-             {years.map(year => (
-               <option key={year} value={year}>{toJapaneseEra(new Date(year, 0, 1))}</option>
-             ))}
-           </select>
-           <select value={currentDate.getMonth()} onChange={handleMonthChange} className="p-1 border rounded">
-             {months.map(month => (
-               <option key={month} value={month}>{month + 1}月</option>
-             ))}
-           </select>
+    <div className="container mx-auto p-4 bg-white shadow-lg rounded-lg relative">
+      <header className="grid grid-cols-1 md:grid-cols-3 items-center mb-4 gap-4">
+        {/* 年月・社員選択 */}
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2">
+            <select value={currentDate.getFullYear()} onChange={handleYearChange} className="p-1 border rounded">
+              {years.map(year => (
+                <option key={year} value={year}>{toJapaneseEra(new Date(year, 0, 1))}</option>
+              ))}
+            </select>
+            <select value={currentDate.getMonth()} onChange={handleMonthChange} className="p-1 border rounded">
+              {months.map(month => (
+                <option key={month} value={month}>{month + 1}月</option>
+              ))}
+            </select>
+          </div>
+          {/* 社員選択: 自分のデータのみならdisabled、権限あれば選択可能 */}
+          <select
+            value={selectedEmployee?.employee_id}
+            onChange={onEmployeeChange}
+            className="p-1 border rounded"
+            disabled={isEmployee && !isManager && !isAccounting} // 社員は変更不可
+          >
+            {employees.map(emp => (
+              <option key={emp.employee_id} value={emp.employee_id}>{emp.employee_name}</option>
+            ))}
+          </select>
         </div>
 
-        <h1 className="text-center text-lg font-bold" style={{fontSize: '14pt', letterSpacing: '0.5em'}}>
-          作業報告書
-          {isReportScreenDirty && <span className="text-red-500 ml-4 text-sm">(更新あり)</span>}
-        </h1>
+        <div className="text-center">
+          <h1 className="text-lg font-bold inline-block" style={{fontSize: '14pt', letterSpacing: '0.1em'}}>
+            作業報告書
+          </h1>
+          <div className="ml-2 inline-block align-middle">
+            {getStatusBadge()}
+            {isReportScreenDirty && <span className="text-red-500 ml-2 text-xs">(未保存)</span>}
+          </div>
+        </div>
 
-        {/* 操作ボタン */}
-        <div className="flex justify-end items-center space-x-2">
-            {message && <div className="text-green-600 mr-4">{message}</div>}
-            <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">日報一覧</button>
-            <button onClick={onOpenMaster} className="bg-gray-700 text-white px-4 py-1 rounded hover:bg-gray-600">マスター</button>
-            <button
-              onClick={onSave}
-              className={`px-4 py-1 rounded ${isReadOnly ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-500'}`}
-              disabled={isReadOnly}
-            >
-              保存
-            </button>
-            <button onClick={onPrint} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500">印刷</button>
+        {/* 操作ボタンエリア: 役割とステータスに応じて可変 */}
+        <div className="flex justify-end items-center space-x-2 flex-wrap">
+            {message && <div className="text-green-600 mr-4 text-sm w-full text-right mb-1">{message}</div>}
+
+            <button onClick={onOpenDailyReportList} className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm">日報一覧</button>
+
+            {/* マスターボタン: 管理者のみ */}
+            {(isManager || isAccounting) && (
+              <button onClick={onOpenMaster} className="bg-gray-700 text-white px-3 py-1 rounded hover:bg-gray-600 text-sm">マスター</button>
+            )}
+
+            {/* 保存ボタン: 編集可能な場合のみ */}
+            {isEditable && (
+              <button onClick={onSave} className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500 text-sm">保存</button>
+            )}
+
+            <button onClick={onPrint} className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-500 text-sm">印刷</button>
         </div>
       </header>
 
+      {/* 承認操作パネル (新しいUI要件) */}
+      <div className="bg-blue-50 border border-blue-200 p-2 rounded mb-4 flex justify-between items-center">
+        <div className="text-sm">
+           <span className="font-bold mr-2">承認状況:</span>
+           {status === 'draft' && '未提出'}
+           {status === 'submitted' && `提出済 (${submittedDate || ''})`}
+           {status === 'approved' && `部長承認済 (${managerApprovalDate || ''})`}
+           {status === 'finalized' && `完了 (${accountingApprovalDate || ''})`}
+           {status === 'remanded' && `差戻し中 (理由: ${remandReason || ''})`}
+        </div>
+        <div className="space-x-2">
+           {/* 本人: 提出 (draft/remanded の場合) */}
+           {isSelf && (status === 'draft' || status === 'remanded') && (
+             <button onClick={onSubmitReport} className="bg-blue-600 text-white px-4 py-1 rounded hover:bg-blue-500 shadow text-sm font-bold">
+               提出する
+             </button>
+           )}
+           {/* 本人: 提出取消 (submitted の場合) */}
+           {isSelf && status === 'submitted' && (
+             <button onClick={onCancelStatus} className="text-red-600 hover:underline text-sm ml-2">
+               提出を取り消す
+             </button>
+           )}
+
+           {/* 部長: 承認/差戻し (submitted の場合) */}
+           {isManager && status === 'submitted' && (
+             <>
+               <button onClick={onApproveReport} className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-500 shadow text-sm font-bold">
+                 承認
+               </button>
+               <button onClick={() => setRemandModalOpen(true)} className="bg-red-500 text-white px-4 py-1 rounded hover:bg-red-400 shadow text-sm font-bold">
+                 差戻し
+               </button>
+             </>
+           )}
+           {/* 部長: 承認取消 (approved の場合) */}
+           {isManager && status === 'approved' && (
+              <button onClick={onCancelStatus} className="text-red-600 hover:underline text-sm ml-2">
+                承認を取り消す
+              </button>
+           )}
+
+           {/* 経理: 完了 (approved の場合) */}
+           {isAccounting && status === 'approved' && (
+             <button onClick={onFinalizeReport} className="bg-purple-600 text-white px-4 py-1 rounded hover:bg-purple-500 shadow text-sm font-bold">
+               完了 (最終承認)
+             </button>
+           )}
+           {/* 経理: 完了取消 (finalized の場合) */}
+           {isAccounting && status === 'finalized' && (
+              <button onClick={onCancelStatus} className="text-red-600 hover:underline text-sm ml-2">
+                完了を取り消す
+              </button>
+           )}
+        </div>
+      </div>
+
       {/* 社員情報と印鑑欄 */}
       <div className="flex justify-between items-start mb-4">
-        {/* 社員情報 */}
         <div className="space-y-1 text-10pt">
           <div className="border-b border-black pb-1 flex items-center" style={{ width: '300px' }}>
             <span className="inline-block w-14">会社名</span>：{company?.company_name || ''}
@@ -129,27 +206,36 @@ const ReportScreen = ({
           </div>
         </div>
 
-        {/* 印鑑欄 */}
-        <div className="flex flex-col text-10pt" style={{ width: '100pt', height: '50pt', border: '1px solid black' }}>
-          <div className="text-center border-b border-black h-1/3 flex-none">印鑑</div>
-          <div
-            className={`grow flex items-center justify-center ${!isReadOnly && !approvalDate ? 'cursor-pointer hover:bg-gray-100' : ''}`}
-            onClick={!isReadOnly && !approvalDate ? onApprove : undefined}
-          >
-            {approvalDate ? (
-              <div className="text-red-500 text-center">
-                <p>{selectedEmployee?.employee_name?.split(' ')[0] || ''} {new Date(approvalDate).getMonth() + 1}/{new Date(approvalDate).getDate()}</p>
-                {!isReadOnly && (
-                  <p
-                    className="text-blue-600 hover:underline cursor-pointer"
-                    onClick={onCancelApproval}
-                  >
-                    キャンセル
-                  </p>
-                )}
+        {/* 印鑑欄 (新仕様に合わせて表示を調整) */}
+        <div className="flex border border-black h-16">
+           <div className="w-16 border-r border-black flex flex-col">
+              <div className="text-xs text-center border-b border-black bg-gray-100">担当</div>
+              <div className="flex-grow flex items-center justify-center text-xs">
+                 {submittedDate ? '済' : ''}
               </div>
-            ) : null}
-          </div>
+           </div>
+           <div className="w-16 border-r border-black flex flex-col">
+              <div className="text-xs text-center border-b border-black bg-gray-100">部長</div>
+              <div className="flex-grow flex items-center justify-center text-xs text-red-500">
+                 {managerApprovalDate ? (
+                    <div className="text-center leading-tight">
+                        <div>承認</div>
+                        <div className="text-[9px]">{managerApprovalDate.slice(5)}</div>
+                    </div>
+                 ) : ''}
+              </div>
+           </div>
+           <div className="w-16 flex flex-col">
+              <div className="text-xs text-center border-b border-black bg-gray-100">経理</div>
+              <div className="flex-grow flex items-center justify-center text-xs text-red-500">
+                 {accountingApprovalDate ? (
+                    <div className="text-center leading-tight">
+                        <div>完了</div>
+                        <div className="text-[9px]">{accountingApprovalDate.slice(5)}</div>
+                    </div>
+                 ) : ''}
+              </div>
+           </div>
         </div>
       </div>
 
@@ -165,11 +251,12 @@ const ReportScreen = ({
           onWorkRecordsChange={onWorkRecordsChange}
           onMonthlySummaryChange={onMonthlySummaryChange}
           onRowClick={onRowClick}
-          isReadOnly={isReadOnly}
+          isReadOnly={!isEditable} // 編集不可ステータスならRead-Only
+          clients={clients}
+          projects={projects}
         />
       )}
       
-      {/* 請求先・案件別集計表 */}
       <div className="mt-4">
         <h2 className="font-bold block mb-1">請求先・案件別集計表</h2>
         {projectSummary && projectSummary.length > 0 ? (
@@ -198,19 +285,41 @@ const ReportScreen = ({
         )}
       </div>
 
-      {/* 特記事項 */}
+      {/* 特記事項 (連絡・申し送り事項) */}
       <div className="mt-4">
-        <label htmlFor="special-notes-textarea" className="font-bold block mb-1">特記事項</label>
+        <label htmlFor="special-notes-textarea" className="font-bold block mb-1">
+          特記事項 / 連絡・申し送り事項
+        </label>
         <textarea
           id="special-notes-textarea"
           value={specialNotes}
           onChange={(e) => onSpecialNotesChange(e.target.value)}
           rows="5"
-          className={`w-full p-2 border rounded ${isReadOnly ? 'bg-gray-100' : ''}`}
-          placeholder={isReadOnly ? "オーナーのみ編集可能です。" : "この月の特記事項を入力してください..."}
-          readOnly={isReadOnly}
+          className="w-full p-2 border rounded bg-white"
+          placeholder="業務報告や申し送り事項を入力してください..."
+          readOnly={!isEditable} // ここもレポート本体と同じロック条件とする
         ></textarea>
       </div>
+
+      {/* 差戻しモーダル */}
+      {remandModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded shadow-lg w-96">
+            <h3 className="text-lg font-bold mb-4">差戻し理由を入力</h3>
+            <textarea
+              className="w-full border p-2 rounded mb-4 h-32"
+              value={remandReasonInput}
+              onChange={(e) => setRemandReasonInput(e.target.value)}
+              placeholder="修正が必要な箇所などを入力してください"
+            ></textarea>
+            <div className="flex justify-end space-x-2">
+              <button onClick={() => setRemandModalOpen(false)} className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">キャンセル</button>
+              <button onClick={handleRemandSubmit} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-500">差戻し実行</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -1,26 +1,47 @@
 const { test, expect } = require('@playwright/test');
 
-test('verify changes', async ({ page }) => {
+test('verify deleted_flag update', async ({ page }) => {
   await page.goto('http://localhost:5173/');
 
-  // テーブルが表示されるのを待ちます
-  await page.waitForSelector('table');
+  // デバッグ用に初期表示のスクリーンショットを撮影
+  await page.screenshot({ path: 'verification/debug_initial_page.png' });
 
-  // 「代休」リンクが存在し、正しいhref属性を持っていることを確認します
-  const daikyuLink = page.locator('a:has-text("代休")');
-  await expect(daikyuLink).toBeVisible();
-  await expect(daikyuLink).toHaveAttribute('href', '/holiday_difference.docx');
-  await expect(daikyuLink).toHaveAttribute('target', '_blank');
+  // マスターメンテナンスボタンをクリック
+  await page.click('button:has-text("マスター")');
 
-  // 「振休」リンクが存在し、正しいhref属性を持っていることを確認します
-  const furikyuLink = page.locator('a:has-text("振休")');
-  await expect(furikyuLink).toBeVisible();
-  await expect(furikyuLink).toHaveAttribute('href', '/holiday_difference.docx');
-  await expect(furikyuLink).toHaveAttribute('target', '_blank');
+  // 案件マスタタブをクリック
+  await page.click('button:has-text("案件マスタ")');
 
-  // 「休日出勤」というテキストが存在しないことを確認します
-  await expect(page.locator('text=休日出勤')).not.toBeVisible();
+  // 最初のtd要素（ID列）が正確に"2"である行を特定する
+  const projectRow = page.locator('tr').filter({
+    has: page.locator('td').nth(0).filter({ hasText: /^2$/ })
+  });
 
-  // ページのスクリーンショットを撮ります
-  await page.screenshot({ path: 'verification.png' });
+  // その行に含まれる2番目のselect要素（削除フラグ）の値を変更する
+  await projectRow.locator('select').nth(1).selectOption('1');
+
+  // 更新ボタンをクリック
+  await projectRow.locator('button:has-text("更新")').click();
+
+  // アラートが表示されたらOKをクリックするよう設定
+  page.on('dialog', dialog => dialog.accept());
+
+  // 一度モーダルを閉じる
+  await page.click('button:has-text("閉じる")');
+
+  // --- 検証フェーズ ---
+  // 再度マスターメンテナンスを開く
+  await page.click('button:has-text("マスター")');
+  await page.click('button:has-text("案件マスタ")');
+
+  // ID 2の案件の行を再度特定
+  const updatedProjectRow = page.locator('tr').filter({
+    has: page.locator('td').nth(0).filter({ hasText: /^2$/ })
+  });
+
+  // 削除フラグが「あり」("1")になっていることを確認
+  const selectValue = await updatedProjectRow.locator('select').nth(1).inputValue();
+  expect(selectValue).toBe('1');
+
+  await page.screenshot({ path: 'verification/verification.png' });
 });
