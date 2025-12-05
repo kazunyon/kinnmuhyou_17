@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { format, getDaysInMonth } from 'date-fns';
 import ReportScreen from './components/ReportScreen';
@@ -140,83 +140,83 @@ function App() {
     determineInitialDate();
   }, [user]);
 
-  // selectedEmployeeId変更時のデータ取得
-  useEffect(() => {
+  const fetchWorkData = useCallback(async () => {
     if (!user || !selectedEmployeeId) return;
 
-    const fetchWorkData = async () => {
-      setIsLoading(true);
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
-      try {
-        const [recordsRes, holidaysRes] = await Promise.all([
-           axios.get(`${API_URL}/work_records/${selectedEmployeeId}/${year}/${month}`),
-           axios.get(`${API_URL}/holidays/${year}`)
-        ]);
-        
-        const recordsMap = new Map(recordsRes.data.records.map(r => [r.day, r]));
-        const daysInMonth = getDaysInMonth(currentDate);
-        const newRecords = Array.from({ length: daysInMonth }, (_, i) => {
-          const day = i + 1;
-          return recordsMap.get(day) || { day, work_content: '', start_time: '', end_time: '', break_time: '00:00' };
-        });
+    setIsLoading(true);
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    try {
+      const [recordsRes, holidaysRes] = await Promise.all([
+          axios.get(`${API_URL}/work_records/${selectedEmployeeId}/${year}/${month}`),
+          axios.get(`${API_URL}/holidays/${year}`)
+      ]);
 
-        const newSpecialNotes = recordsRes.data.special_notes || "";
-        const newApprovalDate = recordsRes.data.approval_date || null;
-        const newMonthlySummary = recordsRes.data.monthly_summary || {};
-        const newProjectSummary = recordsRes.data.project_summary || [];
+      const recordsMap = new Map(recordsRes.data.records.map(r => [r.day, r]));
+      const daysInMonth = getDaysInMonth(currentDate);
+      const newRecords = Array.from({ length: daysInMonth }, (_, i) => {
+        const day = i + 1;
+        return recordsMap.get(day) || { day, work_content: '', start_time: '', end_time: '', break_time: '00:00' };
+      });
 
-        // 新しいステータス情報
-        const newStatus = recordsRes.data.status || 'draft';
-        const newSubmittedDate = recordsRes.data.submitted_date || null;
-        const newManagerApprovalDate = recordsRes.data.manager_approval_date || null;
-        const newAccountingApprovalDate = recordsRes.data.accounting_approval_date || null;
-        const newRemandReason = recordsRes.data.remand_reason || null;
+      const newSpecialNotes = recordsRes.data.special_notes || "";
+      const newApprovalDate = recordsRes.data.approval_date || null;
+      const newMonthlySummary = recordsRes.data.monthly_summary || {};
+      const newProjectSummary = recordsRes.data.project_summary || [];
 
-        if (newMonthlySummary.substitute_holidays === undefined) {
-          newMonthlySummary.substitute_holidays = 0;
-        }
+      // 新しいステータス情報
+      const newStatus = recordsRes.data.status || 'draft';
+      const newSubmittedDate = recordsRes.data.submitted_date || null;
+      const newManagerApprovalDate = recordsRes.data.manager_approval_date || null;
+      const newAccountingApprovalDate = recordsRes.data.accounting_approval_date || null;
+      const newRemandReason = recordsRes.data.remand_reason || null;
 
-        setWorkRecords(newRecords);
-        setInitialWorkRecords(newRecords);
-        setSpecialNotes(newSpecialNotes);
-        setInitialSpecialNotes(newSpecialNotes);
-        setApprovalDate(newApprovalDate);
-        setMonthlySummary(newMonthlySummary);
-        setInitialMonthlySummary(newMonthlySummary);
-        setProjectSummary(newProjectSummary);
-        setHolidays(holidaysRes.data);
-
-        setStatus(newStatus);
-        setInitialStatus(newStatus);
-        setSubmittedDate(newSubmittedDate);
-        setManagerApprovalDate(newManagerApprovalDate);
-        setAccountingApprovalDate(newAccountingApprovalDate);
-        setRemandReason(newRemandReason);
-
-        setIsReportScreenDirty(false);
-        setHasDailyReportBeenUpdated(false);
-        
-      } catch (error) {
-        console.error("作業記録の取得に失敗しました:", error);
-        setMessage("作業記録の取得に失敗しました（権限がない可能性があります）。");
-        // 権限エラー等の場合、空データをセットする前にリセットする
-        const daysInMonth = getDaysInMonth(currentDate);
-        const emptyRecords = Array.from({ length: daysInMonth }, (_, i) => ({
-          day: i + 1, work_content: '', start_time: '', end_time: '', break_time: '00:00'
-        }));
-        setWorkRecords(emptyRecords);
-        setInitialWorkRecords(emptyRecords);
-        setSpecialNotes("");
-        setInitialSpecialNotes("");
-        setStatus('draft');
-      } finally {
-        setIsLoading(false);
+      if (newMonthlySummary.substitute_holidays === undefined) {
+        newMonthlySummary.substitute_holidays = 0;
       }
-    };
 
+      setWorkRecords(newRecords);
+      setInitialWorkRecords(newRecords);
+      setSpecialNotes(newSpecialNotes);
+      setInitialSpecialNotes(newSpecialNotes);
+      setApprovalDate(newApprovalDate);
+      setMonthlySummary(newMonthlySummary);
+      setInitialMonthlySummary(newMonthlySummary);
+      setProjectSummary(newProjectSummary);
+      setHolidays(holidaysRes.data);
+
+      setStatus(newStatus);
+      setInitialStatus(newStatus);
+      setSubmittedDate(newSubmittedDate);
+      setManagerApprovalDate(newManagerApprovalDate);
+      setAccountingApprovalDate(newAccountingApprovalDate);
+      setRemandReason(newRemandReason);
+
+      setIsReportScreenDirty(false);
+      setHasDailyReportBeenUpdated(false);
+
+    } catch (error) {
+      console.error("作業記録の取得に失敗しました:", error);
+      setMessage("作業記録の取得に失敗しました（権限がない可能性があります）。");
+      // 権限エラー等の場合、空データをセットする前にリセットする
+      const daysInMonth = getDaysInMonth(currentDate);
+      const emptyRecords = Array.from({ length: daysInMonth }, (_, i) => ({
+        day: i + 1, work_content: '', start_time: '', end_time: '', break_time: '00:00'
+      }));
+      setWorkRecords(emptyRecords);
+      setInitialWorkRecords(emptyRecords);
+      setSpecialNotes("");
+      setInitialSpecialNotes("");
+      setStatus('draft');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, selectedEmployeeId, currentDate]);
+
+  // selectedEmployeeId変更時のデータ取得
+  useEffect(() => {
     fetchWorkData();
-  }, [selectedEmployeeId, currentDate, user]);
+  }, [fetchWorkData]);
 
   useEffect(() => {
     const isDirty =
@@ -449,11 +449,8 @@ function App() {
         employeeName={selectedEmployee?.employee_name}
         date={selectedDateForDailyReport}
         workRecord={workRecords.find(r => selectedDateForDailyReport && r.day === new Date(selectedDateForDailyReport).getDate())}
-        onSave={(updatedWorkRecord) => {
-            const updatedRecords = workRecords.map(r => 
-                r.day === updatedWorkRecord.day ? {...r, ...updatedWorkRecord} : r
-            );
-            setWorkRecords(updatedRecords);
+        onSave={() => {
+            fetchWorkData();
         }}
         onReportUpdate={setHasDailyReportBeenUpdated}
         isReadOnly={status !== 'draft' && status !== 'remanded'} // 日報もロック
