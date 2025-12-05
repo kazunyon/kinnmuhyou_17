@@ -44,7 +44,8 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
-
+  /** @type {object} 初期データの保持用 */
+  const initialData = useRef(null);
 
   // --- 明細関連の状態管理 ---
   const [details, setDetails] = useState([]);
@@ -77,11 +78,12 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 initialBreakTime = '01:00';
             }
 
-            setTimes({
+            const initialTimes = {
                 startTime: workRecord?.start_time || '09:00',
                 endTime: workRecord?.end_time || '18:00',
                 breakTime: initialBreakTime
-            });
+            };
+            setTimes(initialTimes);
 
             // 日報データ取得
             const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
@@ -89,13 +91,21 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 work_summary: workRecord?.work_content || '',
                 problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
             };
-            setReportData(response.data ? { ...initialReportText, ...response.data } : initialReportText);
+            const loadedReportData = response.data ? { ...initialReportText, ...response.data } : initialReportText;
+            setReportData(loadedReportData);
 
             // 明細設定
             const initialDetails = workRecord?.details?.map(d => ({
                 client_id: d.client_id, project_id: d.project_id, work_time: d.work_time
             })) || [];
             setDetails(initialDetails);
+
+            // 初期データを保存
+            initialData.current = {
+                reportData: loadedReportData,
+                times: initialTimes,
+                details: initialDetails
+            };
 
         } catch (error) {
             console.error("日報データの読み込みに失敗しました:", error);
@@ -232,6 +242,19 @@ ${reportData.thoughts}`;
    * @type {JSX.Element}
    */
   const handleSaveAndClose = async () => {
+    // 変更検知
+    const currentData = {
+        reportData: reportData,
+        times: times,
+        details: details
+    };
+
+    // 単純なJSON文字列比較で変更を検知
+    if (initialData.current && JSON.stringify(currentData) === JSON.stringify(initialData.current)) {
+        alert('何も変わってはいません');
+        return;
+    }
+
     let finalTimes = { ...times };
     const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
     if (restKeywords.includes(reportData.work_summary.trim())) {
@@ -269,7 +292,7 @@ ${reportData.thoughts}`;
     <div className="flex justify-end items-center space-x-4">
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-      <button onClick={handleSaveAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
+      <button onClick={handleSaveAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
     </div>
   );
 
