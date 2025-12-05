@@ -44,7 +44,8 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
-
+  /** @type {object} 初期データの保持用 */
+  const initialData = useRef(null);
 
   // --- 明細関連の状態管理 ---
   const [details, setDetails] = useState([]);
