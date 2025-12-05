@@ -54,6 +54,8 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const [totalDetailTime, setTotalDetailTime] = useState(0);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
+  const [initialData, setInitialData] = useState(null);
+
   // --- データ取得 ---
   useEffect(() => {
     if (!isOpen) return;
@@ -78,12 +80,12 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 initialBreakTime = '01:00';
             }
 
-            const initialTimes = {
+            const newTimes = {
                 startTime: workRecord?.start_time || '09:00',
                 endTime: workRecord?.end_time || '18:00',
                 breakTime: initialBreakTime
             };
-            setTimes(initialTimes);
+            setTimes(newTimes);
 
             // 日報データ取得
             const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
@@ -91,8 +93,8 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 work_summary: workRecord?.work_content || '',
                 problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
             };
-            const loadedReportData = response.data ? { ...initialReportText, ...response.data } : initialReportText;
-            setReportData(loadedReportData);
+            const newReportData = response.data ? { ...initialReportText, ...response.data } : initialReportText;
+            setReportData(newReportData);
 
             // 明細設定
             const initialDetails = workRecord?.details?.map(d => ({
@@ -100,12 +102,11 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
             })) || [];
             setDetails(initialDetails);
 
-            // 初期データを保存
-            initialData.current = {
-                reportData: loadedReportData,
-                times: initialTimes,
+            setInitialData({
+                reportData: newReportData,
+                times: newTimes,
                 details: initialDetails
-            };
+            });
 
         } catch (error) {
             console.error("日報データの読み込みに失敗しました:", error);
@@ -242,15 +243,13 @@ ${reportData.thoughts}`;
    * @type {JSX.Element}
    */
   const handleSaveAndClose = async () => {
-    // 変更検知
     const currentData = {
         reportData: reportData,
         times: times,
         details: details
     };
 
-    // 単純なJSON文字列比較で変更を検知
-    if (initialData.current && JSON.stringify(currentData) === JSON.stringify(initialData.current)) {
+    if (initialData && JSON.stringify(currentData) === JSON.stringify(initialData)) {
         alert('何も変わってはいません');
         return;
     }
@@ -272,14 +271,7 @@ ${reportData.thoughts}`;
         details: details
       });
 
-      onSave({
-          day: new Date(date).getDate(),
-          start_time: finalTimes.startTime,
-          end_time: finalTimes.endTime,
-          break_time: finalTimes.breakTime,
-          work_content: reportData.work_summary,
-          details: details
-      });
+      onSave();
       onReportUpdate(true);
       onRequestClose();
     } catch (error) {
