@@ -54,7 +54,7 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const [totalDetailTime, setTotalDetailTime] = useState(0);
   const [includeDeleted, setIncludeDeleted] = useState(false);
 
-  const [initialData, setInitialData] = useState(null);
+/*  const [initialData, setInitialData] = useState(null);  */
 
   // --- データ取得 ---
   useEffect(() => {
