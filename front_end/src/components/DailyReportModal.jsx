@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Modal from 'react-modal';
 import axios from 'axios';
 
@@ -44,7 +44,9 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
       startTime: '09:00', endTime: '18:00', breakTime: '01:00'
   });
 
-
+  const [initialReportData, setInitialReportData] = useState(null);
+  const [initialTimes, setInitialTimes] = useState(null);
+  const [initialDetails, setInitialDetails] = useState(null);
 
   // --- 明細関連の状態管理 ---
   const [details, setDetails] = useState([]);
@@ -77,11 +79,13 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 initialBreakTime = '01:00';
             }
 
-            setTimes({
+            const newTimes = {
                 startTime: workRecord?.start_time || '09:00',
                 endTime: workRecord?.end_time || '18:00',
                 breakTime: initialBreakTime
-            });
+            };
+            setTimes(newTimes);
+            setInitialTimes(newTimes);
 
             // 日報データ取得
             const response = await axios.get(`${API_URL}/daily_report/${employeeId}/${date}`);
@@ -89,13 +93,16 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
                 work_summary: workRecord?.work_content || '',
                 problems: '・', challenges: '・', tomorrow_tasks: '・', thoughts: '・'
             };
-            setReportData(response.data ? { ...initialReportText, ...response.data } : initialReportText);
+            const loadedReportData = response.data ? { ...initialReportText, ...response.data } : initialReportText;
+            setReportData(loadedReportData);
+            setInitialReportData(loadedReportData);
 
             // 明細設定
-            const initialDetails = workRecord?.details?.map(d => ({
+            const initialDetailsList = workRecord?.details?.map(d => ({
                 client_id: d.client_id, project_id: d.project_id, work_time: d.work_time
             })) || [];
-            setDetails(initialDetails);
+            setDetails(initialDetailsList);
+            setInitialDetails(JSON.parse(JSON.stringify(initialDetailsList)));
 
         } catch (error) {
             console.error("日報データの読み込みに失敗しました:", error);
@@ -227,11 +234,22 @@ ${reportData.thoughts}`;
       );
   };
 
+  const hasChanges = () => {
+    return JSON.stringify(times) !== JSON.stringify(initialTimes) ||
+           JSON.stringify(reportData) !== JSON.stringify(initialReportData) ||
+           JSON.stringify(details) !== JSON.stringify(initialDetails);
+  };
+
   /**
    * アクションボタン群をレンダリングするための変数。
    * @type {JSX.Element}
    */
   const handleSaveAndClose = async () => {
+    if (!hasChanges()) {
+      alert("変更がありません");
+      return;
+    }
+
     let finalTimes = { ...times };
     const restKeywords = ['休み', '代休', '振休', '有給', '欠勤'];
     if (restKeywords.includes(reportData.work_summary.trim())) {
@@ -269,7 +287,7 @@ ${reportData.thoughts}`;
     <div className="flex justify-end items-center space-x-4">
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>
       <button onClick={handlePostReport} className="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">日報ポスト</button>
-      <button onClick={handleSaveAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">適用して閉じる</button>
+      <button onClick={handleSaveAndClose} className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">保存</button>
     </div>
   );
 
