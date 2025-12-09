@@ -224,4 +224,8 @@ class AttendanceCalculator:
 
         formatted_time_totals = {f"total_{key}": self._format_timedelta(td) for key, td in time_totals.items()}
 
+        # ユーザー要望に基づき、深夜労働（平日・休日問わず）の合計を計算
+        total_combined_late_night_work = time_totals['late_night_work'] + time_totals['late_night_holiday_work']
+        formatted_time_totals['total_combined_late_night_work'] = self._format_timedelta(total_combined_late_night_work)
+
         return {**day_counts, **formatted_time_totals}
