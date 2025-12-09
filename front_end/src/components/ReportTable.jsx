@@ -253,15 +253,14 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
               {monthlySummary && (
                 <div className="flex justify-end space-x-3">
                   <span>所定内: {monthlySummary.total_scheduled_work || '0:00'}</span>
-                  <span>法定内残業: {monthlySummary.total_statutory_inner_overtime || '0:00'}</span>
                   <span>法定外残業: {monthlySummary.total_statutory_outer_overtime || '0:00'}</span>
-                  <span>深夜労働: {
+                  <span className="text-green-600">深夜労働: {
                     minutesToTime(
                       timeToMinutes(monthlySummary.total_late_night_work) +
                       timeToMinutes(monthlySummary.total_late_night_holiday_work)
                     )
                   }</span>
-                  <span>休日労働: {monthlySummary.total_holiday_work || '0:00'}</span>
+                  <span className="text-red-600">休日労働: {monthlySummary.total_holiday_work || '0:00'}</span>
                 </div>
               )}
             </td>
