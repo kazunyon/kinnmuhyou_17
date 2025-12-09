@@ -249,7 +249,17 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
           <tr className="bg-gray-200 font-bold">
             <td colSpan="2" className="border border-gray-300 p-1">合計</td>
             <td className="border border-gray-300 p-1">{minutesToTime(totalWorkTimeMinutes)}</td>
-            <td colSpan="6" className="border border-gray-300 p-1"></td>
+            <td colSpan="6" className="border border-gray-300 p-1 text-right text-xs">
+              {monthlySummary && (
+                <div className="flex justify-end gap-3 flex-wrap">
+                   <span>所定内: {monthlySummary.total_scheduled_work || '0:00'}</span>
+                   <span>法定内: {monthlySummary.total_statutory_inner_overtime || '0:00'}</span>
+                   <span>法定外: {monthlySummary.total_statutory_outer_overtime || '0:00'}</span>
+                   <span>深夜: {monthlySummary.total_late_night_work || '0:00'}</span>
+                   <span>休日: {monthlySummary.total_holiday_work || '0:00'}</span>
+                </div>
+              )}
+            </td>
           </tr>
           {/* --- 月次集計フッター --- */}
           {monthlySummary && (
