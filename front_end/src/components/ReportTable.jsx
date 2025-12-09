@@ -31,7 +31,7 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
    * @returns {number} 経過分数。無効な入力の場合は0を返す。
    */
   const timeToMinutes = (timeStr) => {
-    if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return 0;
+    if (!timeStr || !/^\d+:\d+$/.test(timeStr)) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
   };
@@ -249,7 +249,22 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
           <tr className="bg-gray-200 font-bold">
             <td colSpan="2" className="border border-gray-300 p-1">合計</td>
             <td className="border border-gray-300 p-1">{minutesToTime(totalWorkTimeMinutes)}</td>
-            <td colSpan="6" className="border border-gray-300 p-1"></td>
+            <td colSpan="6" className="border border-gray-300 p-1 text-xs text-right align-middle">
+              {monthlySummary && (
+                <div className="flex justify-end space-x-3">
+                  <span>所定内: {monthlySummary.total_scheduled_work || '0:00'}</span>
+                  <span>法定内残業: {monthlySummary.total_statutory_inner_overtime || '0:00'}</span>
+                  <span>法定外残業: {monthlySummary.total_statutory_outer_overtime || '0:00'}</span>
+                  <span>深夜労働: {
+                    minutesToTime(
+                      timeToMinutes(monthlySummary.total_late_night_work) +
+                      timeToMinutes(monthlySummary.total_late_night_holiday_work)
+                    )
+                  }</span>
+                  <span>休日労働: {monthlySummary.total_holiday_work || '0:00'}</span>
+                </div>
+              )}
+            </td>
           </tr>
           {/* --- 月次集計フッター --- */}
           {monthlySummary && (
