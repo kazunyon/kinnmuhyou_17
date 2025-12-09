@@ -133,8 +133,15 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const handleTimeChange = (field, part, value) => {
       const currentTime = times[field];
       let [h, m] = (currentTime || "00:00").split(':');
-      if(part === 'h') h = value;
+      if(part === 'h') {
+          h = value;
+          // 24時が選択された場合、分を00にリセット
+          if (h === '24') {
+              m = '00';
+          }
+      }
       if(part === 'm') m = value;
+
       setTimes(prev => ({...prev, [field]: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`}));
   };
   
@@ -211,7 +218,10 @@ ${reportData.thoughts}`;
   };
   
   // 時間と分の選択肢を生成
-  const hourOptions = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
+  // 終了時間のみ "24" を許容するためのオプション
+  const startHourOptions = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
+  const endHourOptions = Array.from({length: 25}, (_, i) => String(i).padStart(2, '0')); // 00-24
+
   const minuteOptions = ['00', '15', '30', '45'];
   const breakMinuteOptions = Array.from({length: 21}, (_, i) => String(i * 15)); // 0分から300分(5時間)まで
 
@@ -223,15 +233,34 @@ ${reportData.thoughts}`;
    */
   const renderTimePicker = (field, label) => {
       const [h, m] = (times[field] || "00:00").split(":");
+      const isEndTime = field === 'endTime';
+      const hours = isEndTime ? endHourOptions : startHourOptions;
+
+      // 24時の場合は分を00に固定、それ以外は通常の選択肢
+      const minutes = (h === '24') ? ['00'] : minuteOptions;
+
+      // 24時が選択されたときに、分が00以外なら00に強制リセットする処理は handleTimeChange で行うか、
+      // ここでレンダリング時に制御する。
+      // selectのvalueが選択肢にない場合、ブラウザによっては空になるので注意。
+
       return (
           <div className="flex items-center space-x-2">
               <span className="w-20">{label}</span>
-              <select value={h} onChange={(e) => handleTimeChange(field, 'h', e.target.value)} className="border rounded p-1">
-                  {hourOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              <select
+                value={h}
+                onChange={(e) => handleTimeChange(field, 'h', e.target.value)}
+                className="border rounded p-1"
+              >
+                  {hours.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
               <span>時</span>
-              <select value={m} onChange={(e) => handleTimeChange(field, 'm', e.target.value)} className="border rounded p-1">
-                  {minuteOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              <select
+                value={m}
+                onChange={(e) => handleTimeChange(field, 'm', e.target.value)}
+                className="border rounded p-1"
+                disabled={h === '24'} // 24時のときは分を変更不可に
+              >
+                  {minutes.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
               <span>分</span>
           </div>
