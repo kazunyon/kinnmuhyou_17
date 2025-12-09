@@ -1,6 +1,6 @@
 /**
  * "HH:MM" 形式の時間文字列を分単位の数値に変換します。
- * '23:59'までの時間を正しく扱います。
+ * '24:00'までの時間を正しく扱います。
  *
  * @param {string} timeStr - "HH:MM" 形式の時間文字列。
  * @returns {number|null} 変換された分単位の数値。入力が不正な形式の場合はnullを返します。
@@ -10,6 +10,12 @@ export const timeToMinutes = (timeStr) => {
         return null;
     }
     const [hours, minutes] = timeStr.split(':').map(Number);
+
+    // 24:00 の特別扱い
+    if (hours === 24 && minutes === 0) {
+        return 24 * 60;
+    }
+
     if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
         return hours * 60 + minutes;
     }
@@ -56,7 +62,7 @@ export const formatTime = (input) => {
 };
 
 /**
- * 出退社時刻の入力が有効か（00:00から23:45の間の15分刻みか）を検証します。
+ * 出退社時刻の入力が有効か（00:00から24:00の間の15分刻みか）を検証します。
  *
  * @param {string} timeStr - "HH:MM"形式の時間文字列。
  * @returns {boolean} 時間が有効な場合はtrue、それ以外はfalse。
@@ -64,6 +70,9 @@ export const formatTime = (input) => {
 export const validateTimeInput = (timeStr) => {
     if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return false;
     const [h, m] = timeStr.split(':').map(Number);
+
+    if (h === 24 && m === 0) return true;
+
     return h >= 0 && h <= 23 && m >= 0 && m < 60 && m % 15 === 0;
 };
 
