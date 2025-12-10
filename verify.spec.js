@@ -6,6 +6,14 @@ test('verify deleted_flag update', async ({ page }) => {
   // デバッグ用に初期表示のスクリーンショットを撮影
   await page.screenshot({ path: 'verification/debug_initial_page.png' });
 
+  // ログイン処理
+  await page.fill('#employeeId', '2');
+  await page.fill('#password', '123');
+  await page.click('button:has-text("ログイン")');
+
+  // ログイン後の画面ロードを待機 (マスターボタンが表示されるまで)
+  await page.waitForSelector('button:has-text("マスター")', { timeout: 10000 });
+
   // マスターメンテナンスボタンをクリック
   await page.click('button:has-text("マスター")');
 
