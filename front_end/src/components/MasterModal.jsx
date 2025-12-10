@@ -29,6 +29,7 @@ if (typeof document !== 'undefined' && document.getElementById('root')) {
 /**
  * 社員情報、取引先、案件のマスターメンテナンスを行うモーダルコンポーネント。
  * 認証、各マスターデータの表示・更新、新規追加機能を提供します。
+ *
  * @param {object} props - コンポーネントのプロパティ。
  * @param {boolean} props.isOpen - モーダルが開いているか。
  * @param {Function} props.onRequestClose - モーダルを閉じる関数。
@@ -43,7 +44,8 @@ if (typeof document !== 'undefined' && document.getElementById('root')) {
  */
 const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee, selectedEmployeeId, companies, auth, setAuth, employees: allEmployees }) => {
   // --- 状態管理 ---
-  const [activeTab, setActiveTab] = useState('employees'); // 'employees', 'clients', 'projects'
+  /** @type {[string, Function]} 現在のアクティブなタブ ('employees', 'clients', 'projects') */
+  const [activeTab, setActiveTab] = useState('employees');
 
   // 社員用
   const [employees, setEmployees] = useState([]);
@@ -146,6 +148,9 @@ const MasterModal = ({ isOpen, onRequestClose, onMasterUpdate, onSelectEmployee,
       setNewEmployee(prev => ({...prev, [field]: value}));
   };
 
+  /**
+   * マスター編集のための認証を行います。
+   */
   const handleAuthenticate = async () => {
     if (!authUserId || !passwordInput) {
       alert('認証する社員を選択し、パスワードを入力してください。');

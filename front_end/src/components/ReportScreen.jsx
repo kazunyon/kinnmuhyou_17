@@ -16,6 +16,47 @@ const toJapaneseEra = (date) => {
 
 /**
  * 作業報告書のメイン画面UIを提供するコンポーネント。
+ *
+ * 日次作業記録の表示・編集、月次集計、プロジェクト別集計、ステータス管理、
+ * 特記事項の入力などの機能を提供します。
+ *
+ * @param {Object} props - コンポーネントのプロパティ。
+ * @param {Array<Object>} props.employees - 社員情報のリスト。
+ * @param {Object} props.selectedEmployee - 現在選択されている社員情報。
+ * @param {function} props.onEmployeeChange - 社員選択変更時のコールバック。
+ * @param {Object} props.company - 会社情報。
+ * @param {Date} props.currentDate - 現在表示している年月の日付オブジェクト。
+ * @param {Array<Object>} props.workRecords - 作業記録データのリスト。
+ * @param {Object} props.holidays - 祝日情報オブジェクト。
+ * @param {string} props.specialNotes - 特記事項。
+ * @param {Object} props.monthlySummary - 月次集計データ。
+ * @param {Array<Object>} props.projectSummary - プロジェクト別集計データ。
+ * @param {string|null} props.approvalDate - 承認日（互換用）。
+ * @param {string} props.status - レポートのステータス ('draft', 'submitted', 'approved', etc.)。
+ * @param {string|null} props.submittedDate - 提出日。
+ * @param {string|null} props.managerApprovalDate - 部長承認日。
+ * @param {string|null} props.accountingApprovalDate - 経理承認日。
+ * @param {string|null} props.remandReason - 差し戻し理由。
+ * @param {Object} props.user - ログインユーザー情報。
+ * @param {boolean} props.isLoading - データ読み込み中フラグ。
+ * @param {string} props.message - ユーザーへのメッセージ。
+ * @param {boolean} props.isReportScreenDirty - 未保存の変更があるかどうかのフラグ。
+ * @param {function} props.onDateChange - 年月変更時のコールバック。
+ * @param {function} props.onWorkRecordsChange - 作業記録変更時のコールバック。
+ * @param {function} props.onSpecialNotesChange - 特記事項変更時のコールバック。
+ * @param {function} props.onMonthlySummaryChange - 月次集計変更時のコールバック。
+ * @param {function} props.onSave - 保存ボタン押下時のコールバック。
+ * @param {function} props.onPrint - 印刷ボタン押下時のコールバック。
+ * @param {function} props.onSubmitReport - 提出ボタン押下時のコールバック。
+ * @param {function} props.onApproveReport - 承認ボタン押下時のコールバック。
+ * @param {function} props.onRemandReport - 差し戻しボタン押下時のコールバック。
+ * @param {function} props.onFinalizeReport - 完了ボタン押下時のコールバック。
+ * @param {function} props.onCancelStatus - 取り消しボタン押下時のコールバック。
+ * @param {function} props.onOpenDailyReportList - 日報一覧ボタン押下時のコールバック。
+ * @param {function} props.onOpenMaster - マスターボタン押下時のコールバック。
+ * @param {function} props.onRowClick - 行クリック時のコールバック。
+ *
+ * @returns {JSX.Element} 作業報告書画面のJSX要素。
  */
 const ReportScreen = ({
   employees, selectedEmployee, onEmployeeChange, company, currentDate, workRecords, holidays, specialNotes, monthlySummary,

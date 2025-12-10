@@ -29,6 +29,11 @@ DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db
 # ロギング設定
 # -----------------------------------------------------------------------------
 def setup_logging():
+    """アプリケーションのロギングを設定します。
+
+    'logs'ディレクトリを作成し、日付ごとのログファイルにログを出力するように設定します。
+    ログのフォーマットは '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]' です。
+    """
     if not os.path.exists('logs'):
         os.mkdir('logs')
     log_file_name = f"logs/app_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -46,6 +51,17 @@ setup_logging()
 # データベース接続管理
 # -----------------------------------------------------------------------------
 def get_db():
+    """データベース接続を取得します。
+
+    Flaskのグローバルコンテキスト `g` にデータベース接続を保存し、再利用します。
+    接続が確立されていない場合は、新たに接続を作成します。
+
+    Returns:
+        sqlite3.Connection: データベース接続オブジェクト。
+
+    Raises:
+        sqlite3.Error: データベース接続中にエラーが発生した場合。
+    """
     if 'db' not in g:
         try:
             g.db = sqlite3.connect(DATABASE)
@@ -58,6 +74,11 @@ def get_db():
 
 @app.teardown_appcontext
 def close_db(exception):
+    """リクエスト終了時にデータベース接続をクローズします。
+
+    Args:
+        exception (Exception): 発生した例外（ある場合）。
+    """
     db = g.pop('db', None)
     if db is not None:
         db.close()
@@ -67,6 +88,16 @@ def close_db(exception):
 # 認証・認可デコレータ
 # -----------------------------------------------------------------------------
 def login_required(f):
+    """ログインが必要なエンドポイントのためのデコレータ。
+
+    セッションに `user_id` が存在しない場合、401エラーを返します。
+
+    Args:
+        f (function): デコレート対象の関数。
+
+    Returns:
+        function: ラップされた関数。
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -80,7 +111,14 @@ def login_required(f):
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    """ログイン認証を行い、セッションを開始します。"""
+    """ログイン認証を行い、セッションを開始します。
+
+    リクエストボディから `employee_id` と `password` を取得し、
+    データベースと照合します。成功した場合、セッション情報を設定します。
+
+    Returns:
+        Response: JSON形式のレスポンス。成功時はユーザー情報、失敗時はエラーメッセージ。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     password = data.get('password')
@@ -119,7 +157,13 @@ def login():
 
 @app.route('/api/change_password', methods=['POST'])
 def change_password():
-    """パスワード変更を行います。"""
+    """パスワード変更を行います。
+
+    現在のパスワードを確認後、新しいパスワードをハッシュ化して保存します。
+
+    Returns:
+        Response: JSON形式のレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     current_password = data.get('current_password')
@@ -149,13 +193,25 @@ def change_password():
 
 @app.route('/api/logout', methods=['POST'])
 def logout():
-    """ログアウト処理を行います。"""
+    """ログアウト処理を行います。
+
+    セッションをクリアします。
+
+    Returns:
+        Response: JSON形式のレスポンス。
+    """
     session.clear()
     return jsonify({"message": "ログアウトしました"}), 200
 
 @app.route('/api/me', methods=['GET'])
 def get_current_user():
-    """現在のログインユーザー情報を返します。"""
+    """現在のログインユーザー情報を返します。
+
+    セッションから現在のユーザーID、役割、名前を取得して返します。
+
+    Returns:
+        Response: JSON形式のユーザー情報。ログインしていない場合はNone。
+    """
     if 'user_id' not in session:
         return jsonify(None)
     return jsonify({
@@ -171,6 +227,13 @@ def get_current_user():
 @app.route('/api/employees', methods=['GET'])
 @login_required
 def get_employees():
+    """退職していない社員の一覧を取得します。
+
+    パスワードフィールドは除外されます。
+
+    Returns:
+        Response: 社員情報のリストを含むJSONレスポンス。
+    """
     try:
         db = get_db()
         cursor = db.execute('SELECT * FROM employees WHERE retirement_flag = 0 ORDER BY employee_id')
@@ -185,6 +248,13 @@ def get_employees():
 @app.route('/api/employees/all', methods=['GET'])
 @login_required
 def get_all_employees():
+    """全社員の一覧を取得します（管理者・経理担当者向け）。
+
+    退職済みの社員も含め、全ての社員情報を返します。
+
+    Returns:
+        Response: 全社員情報のリストを含むJSONレスポンス。
+    """
     # 権限チェック: 部長または経理のみ
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
@@ -201,7 +271,13 @@ def get_all_employees():
 @app.route('/api/master/authenticate', methods=['POST'])
 @login_required
 def authenticate_master():
-    """マスターメンテナンス権限チェック (既存互換用だがセッションベースに変更推奨)"""
+    """マスターメンテナンス権限チェックを行います。
+
+    ログイン中のユーザーが管理者または経理担当者であるかを確認します。
+
+    Returns:
+        Response: 認証結果を含むJSONレスポンス。
+    """
     # 既存の実装はパスワードを再送させているが、ログイン済みであればセッションから権限を確認する形が良い。
     # ここでは既存のフローを尊重しつつ、roleチェックを加える。
     data = request.json
@@ -231,6 +307,11 @@ def authenticate_master():
 
 @app.route('/api/companies', methods=['GET'])
 def get_companies():
+    """会社情報の一覧を取得します。
+
+    Returns:
+        Response: 会社情報のリストを含むJSONレスポンス。
+    """
     # ログイン画面でも使うかもしれないので認証なしでもOKとする、あるいは認証必須にする
     try:
         db = get_db()
@@ -243,6 +324,14 @@ def get_companies():
 @app.route('/api/holidays/<int:year>', methods=['GET'])
 @login_required
 def get_holidays(year):
+    """指定された年の祝日データを取得します。
+
+    Args:
+        year (int): 取得対象の年。
+
+    Returns:
+        Response: 日付をキー、祝日名を値とする辞書のJSONレスポンス。
+    """
     try:
         db = get_db()
         cursor = db.execute("SELECT date, holiday_name FROM holidays WHERE strftime('%Y', date) = ?", (str(year),))
@@ -259,6 +348,13 @@ def get_holidays(year):
 @app.route('/api/clients', methods=['GET'])
 @login_required
 def get_clients():
+    """取引先一覧を取得します。
+
+    クエリパラメータ `include_deleted=true` を指定すると、削除済み取引先も含めます。
+
+    Returns:
+        Response: 取引先情報のリストを含むJSONレスポンス。
+    """
     include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
@@ -274,6 +370,13 @@ def get_clients():
 @app.route('/api/clients', methods=['POST'])
 @login_required
 def add_client():
+    """新しい取引先を追加します。
+
+    管理者または経理担当者のみ実行可能です。
+
+    Returns:
+        Response: 作成された取引先のIDを含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     data = request.json
@@ -291,6 +394,14 @@ def add_client():
 @app.route('/api/clients/<int:client_id>', methods=['PUT'])
 @login_required
 def update_client(client_id):
+    """取引先情報を更新します。
+
+    Args:
+        client_id (int): 更新対象の取引先ID。
+
+    Returns:
+        Response: 更新結果を含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     # ... (既存ロジック)
@@ -309,6 +420,14 @@ def update_client(client_id):
 @app.route('/api/clients/<int:client_id>', methods=['DELETE'])
 @login_required
 def delete_client(client_id):
+    """取引先を削除（論理削除）します。
+
+    Args:
+        client_id (int): 削除対象の取引先ID。
+
+    Returns:
+        Response: 削除結果を含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     try:
@@ -323,6 +442,11 @@ def delete_client(client_id):
 @app.route('/api/projects', methods=['GET'])
 @login_required
 def get_projects():
+    """案件一覧を取得します。
+
+    Returns:
+        Response: 案件情報のリストを含むJSONレスポンス。
+    """
     include_deleted = request.args.get('include_deleted') == 'true'
     try:
         db = get_db()
@@ -339,6 +463,11 @@ def get_projects():
 @app.route('/api/projects', methods=['POST'])
 @login_required
 def add_project():
+    """新しい案件を追加します。
+
+    Returns:
+        Response: 作成された案件のIDを含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     data = request.json
@@ -355,6 +484,14 @@ def add_project():
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
 @login_required
 def update_project(project_id):
+    """案件情報を更新します。
+
+    Args:
+        project_id (int): 更新対象の案件ID。
+
+    Returns:
+        Response: 更新結果を含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     data = request.json
@@ -372,6 +509,14 @@ def update_project(project_id):
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 @login_required
 def delete_project(project_id):
+    """案件を削除（論理削除）します。
+
+    Args:
+        project_id (int): 削除対象の案件ID。
+
+    Returns:
+        Response: 削除結果を含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
     try:
@@ -390,6 +535,19 @@ def delete_project(project_id):
 @app.route('/api/work_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 @login_required
 def get_work_records(employee_id, year, month):
+    """指定された従業員、年、月の作業記録と月次集計を取得します。
+
+    AttendanceCalculator を使用して、日次の勤務時間や残業時間、および月次の集計を計算します。
+    プロジェクトごとの作業時間割合も計算します。
+
+    Args:
+        employee_id (int): 従業員ID。
+        year (int): 年。
+        month (int): 月。
+
+    Returns:
+        Response: 作業記録、プロジェクト集計、月次レポート情報を含むJSONレスポンス。
+    """
     # 権限チェック
     current_user_id = session.get('user_id')
     current_role = session.get('role')
@@ -551,6 +709,14 @@ def get_work_records(employee_id, year, month):
 @app.route('/api/work_records', methods=['POST'])
 @login_required
 def save_work_records():
+    """作業記録を保存します。
+
+    日次の作業記録と、月次のレポート情報（特記事項など）を一括で保存します。
+    レポートのステータスが 'draft' または 'remanded' の場合のみ保存可能です。
+
+    Returns:
+        Response: 保存結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -686,6 +852,13 @@ def save_work_records():
 @app.route('/api/monthly_reports/submit', methods=['POST'])
 @login_required
 def submit_monthly_report():
+    """月次レポートを提出します。
+
+    ステータスを 'submitted' に更新します。本人以外は提出できません。
+
+    Returns:
+        Response: 提出結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -720,6 +893,13 @@ def submit_monthly_report():
 @app.route('/api/monthly_reports/approve', methods=['POST'])
 @login_required
 def approve_monthly_report():
+    """月次レポートを承認します（部長向け）。
+
+    ステータスを 'approved' に更新します。部長権限が必要です。
+
+    Returns:
+        Response: 承認結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -751,6 +931,13 @@ def approve_monthly_report():
 @app.route('/api/monthly_reports/remand', methods=['POST'])
 @login_required
 def remand_monthly_report():
+    """月次レポートを差し戻します（部長向け）。
+
+    ステータスを 'remanded' に更新し、差し戻し理由を記録します。
+
+    Returns:
+        Response: 差し戻し結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -782,6 +969,13 @@ def remand_monthly_report():
 @app.route('/api/monthly_reports/finalize', methods=['POST'])
 @login_required
 def finalize_monthly_report():
+    """月次レポートを完了（最終承認）します（経理向け）。
+
+    ステータスを 'finalized' に更新します。経理権限が必要です。
+
+    Returns:
+        Response: 完了処理結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     year = data.get('year')
@@ -814,6 +1008,15 @@ def finalize_monthly_report():
 @app.route('/api/monthly_reports/overview/<int:year>/<int:month>', methods=['GET'])
 @login_required
 def get_monthly_reports_overview(year, month):
+    """月次レポートの提出状況一覧を取得します（管理者・経理向け）。
+
+    Args:
+        year (int): 年。
+        month (int): 月。
+
+    Returns:
+        Response: 各従業員のレポート状況を含むリストのJSONレスポンス。
+    """
     # 権限チェック
     if session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
@@ -851,6 +1054,16 @@ def get_monthly_reports_overview(year, month):
 @app.route('/api/monthly_reports/cancel_approval', methods=['POST'])
 @login_required
 def cancel_approval():
+    """承認または提出を取り消します。
+
+    役割に応じて処理が異なります。
+    - 経理: 'finalized' -> 'approved'
+    - 部長: 'approved' -> 'submitted'
+    - 本人: 'submitted' -> 'draft'
+
+    Returns:
+        Response: 取り消し結果を含むJSONレスポンス。
+    """
     # 既存機能の再実装: 承認を取り消して状態を戻す
     # ロールに応じてどこまで戻すか制御が必要
     # ここではシンプルに: 経理なら finalized -> approved, 部長なら approved -> submitted
@@ -894,6 +1107,18 @@ def cancel_approval():
 @app.route('/api/attendance_records/<int:employee_id>/<int:year>/<int:month>', methods=['GET'])
 @login_required
 def get_attendance_records(employee_id, year, month):
+    """指定された従業員、年、月の勤怠管理表用データを取得します。
+
+    日次の勤怠データと月次の集計データを返します。
+
+    Args:
+        employee_id (int): 従業員ID。
+        year (int): 年。
+        month (int): 月。
+
+    Returns:
+        Response: 日次レコードと月次集計を含むJSONレスポンス。
+    """
     current_user_id = session.get('user_id')
     if current_user_id != employee_id and session.get('role') not in ['manager', 'accounting']:
         return jsonify({"error": "権限がありません"}), 403
@@ -956,6 +1181,11 @@ def get_attendance_records(employee_id, year, month):
 @app.route('/api/attendance_records', methods=['POST'])
 @login_required
 def save_attendance_records():
+    """勤怠管理表のデータを保存します。
+
+    Returns:
+        Response: 保存結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
 
@@ -1047,6 +1277,15 @@ def save_attendance_records():
 @app.route('/api/daily_report/<int:employee_id>/<string:date_str>', methods=['GET'])
 @login_required
 def get_daily_report(employee_id, date_str):
+    """指定された日報を取得します。
+
+    Args:
+        employee_id (int): 従業員ID。
+        date_str (str): 'YYYY-MM-DD'形式の日付文字列。
+
+    Returns:
+        Response: 日報データを含むJSONレスポンス。
+    """
     # 本人または管理者
     if session.get('user_id') != employee_id and session.get('role') not in ['manager', 'accounting']:
          return jsonify({"error": "権限なし"}), 403
@@ -1068,6 +1307,13 @@ def get_daily_report(employee_id, date_str):
 @app.route('/api/daily_report', methods=['POST'])
 @login_required
 def save_daily_report():
+    """日報を保存します。
+
+    日報データとともに、対応する日の作業記録（時間など）も更新します。
+
+    Returns:
+        Response: 保存結果を含むJSONレスポンス。
+    """
     data = request.json
     employee_id = data.get('employee_id')
     date = data.get('date')
@@ -1158,6 +1404,13 @@ def save_daily_report():
 @app.route('/api/employee', methods=['POST'])
 @login_required
 def add_employee():
+    """新しい社員を追加します（管理者・経理向け）。
+
+    初期パスワードは '123' に設定されます。
+
+    Returns:
+        Response: 作成された社員IDを含むJSONレスポンス。
+    """
     # 既存の auth_user_id は無視してセッションを使う
     if session.get('role') not in ['manager', 'accounting']:
          return jsonify({"error": "権限がありません"}), 403
@@ -1192,6 +1445,14 @@ def add_employee():
 @app.route('/api/employee/<int:employee_id>', methods=['PUT'])
 @login_required
 def update_employee(employee_id):
+    """社員情報を更新します（管理者・経理向け）。
+
+    Args:
+        employee_id (int): 更新対象の社員ID。
+
+    Returns:
+        Response: 更新結果を含むJSONレスポンス。
+    """
     if session.get('role') not in ['manager', 'accounting']:
          return jsonify({"error": "権限がありません"}), 403
 
@@ -1225,6 +1486,17 @@ def update_employee(employee_id):
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_frontend(path):
+    """フロントエンドの静的ファイルを配信します。
+
+    SPA（Single Page Application）に対応するため、ファイルが見つからない場合は
+    `index.html` を返します。
+
+    Args:
+        path (str): リクエストされたパス。
+
+    Returns:
+        Response: 静的ファイルまたは `index.html`。
+    """
     static_folder_path = app.static_folder
     if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
         return send_from_directory(static_folder_path, path)

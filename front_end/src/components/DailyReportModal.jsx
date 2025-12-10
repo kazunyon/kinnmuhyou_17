@@ -22,6 +22,8 @@ const modalStyles = {
 
 /**
  * 特定の日付の日報を入力・編集するためのモーダルコンポーネント。
+ * 時間、休憩、作業内容の編集に加え、クライアント・プロジェクトごとの明細時間を入力できます。
+ *
  * @param {object} props - コンポーネントのプロパティ。
  * @param {boolean} props.isOpen - モーダルが開いているかどうか。
  * @param {Function} props.onRequestClose - モーダルを閉じるための関数。
@@ -53,8 +55,6 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   const [projects, setProjects] = useState([]);
   const [totalDetailTime, setTotalDetailTime] = useState(0);
   const [includeDeleted, setIncludeDeleted] = useState(false);
-
-/*  const [initialData, setInitialData] = useState(null);  */
 
   // --- データ取得 ---
   useEffect(() => {
@@ -102,11 +102,11 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
             })) || [];
             setDetails(initialDetails);
 
-            setInitialData({
+            initialData.current = {
                 reportData: newReportData,
                 times: newTimes,
                 details: initialDetails
-            });
+            };
 
         } catch (error) {
             console.error("日報データの読み込みに失敗しました:", error);
@@ -268,8 +268,8 @@ ${reportData.thoughts}`;
   };
 
   /**
-   * アクションボタン群をレンダリングするための変数。
-   * @type {JSX.Element}
+   * 日報データの保存とモーダルを閉じる処理を行います。
+   * 変更がない場合はアラートを表示して終了します。
    */
   const handleSaveAndClose = async () => {
     const currentData = {
@@ -278,7 +278,7 @@ ${reportData.thoughts}`;
         details: details
     };
 
-    if (initialData && JSON.stringify(currentData) === JSON.stringify(initialData)) {
+    if (initialData.current && JSON.stringify(currentData) === JSON.stringify(initialData.current)) {
         alert('何も変わってはいません');
         return;
     }
@@ -309,6 +309,10 @@ ${reportData.thoughts}`;
     }
   };
 
+  /**
+   * アクションボタン群をレンダリングするための変数。
+   * @type {JSX.Element}
+   */
   const actionButtons = (
     <div className="flex justify-end items-center space-x-4">
       <button onClick={onRequestClose} className="px-6 py-2 bg-gray-300 rounded hover:bg-gray-400">閉じる</button>

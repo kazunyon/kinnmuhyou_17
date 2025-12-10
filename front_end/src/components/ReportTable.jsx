@@ -3,16 +3,17 @@ import { getDay, format } from 'date-fns';
 
 /**
  * 月間の作業報告を入力・表示するためのテーブルコンポーネント。
- * 日々の勤務時間、休憩時間、作業内容の入力と、それに基づく自動計算を行う。
+ * 日々の勤務時間、休憩時間、作業内容の入力と、それに基づく自動計算を行います。
+ *
  * @param {object} props - コンポーネントのプロパティ
  * @param {Date} props.currentDate - 表示対象の年月が設定されたDateオブジェクト
  * @param {Array<object>} props.workRecords - 表示対象の1ヶ月分の作業記録リスト
  * @param {object} props.holidays - 祝日データ (キー: 'YYYY-MM-DD', 値: 祝日名)
- * @param {object} props.monthlySummary - 月次集計データ
+ * @param {object} props.monthlySummary - 月次集計データ (出勤日数、欠勤日数など)
  * @param {Function} props.onWorkRecordsChange - 作業記録データが変更されたときのコールバック関数
  * @param {Function} props.onMonthlySummaryChange - 月次集計データが変更されたときのコールバック関数
- * @param {Function} props.onRowClick - テーブルの行がダブルクリックされたときのコールバック関数
- * @param {boolean} props.isReadOnly - テーブルが読み取り専用かどうか
+ * @param {Function} props.onRowClick - テーブルの行がクリックされたときのコールバック関数
+ * @param {boolean} props.isReadOnly - テーブルが読み取り専用かどうか。trueの場合、入力フィールドは無効化されます。
  */
 const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWorkRecordsChange, onMonthlySummaryChange, onRowClick, isReadOnly }) => {
   // クリックで選択された行のインデックスを管理するstate
