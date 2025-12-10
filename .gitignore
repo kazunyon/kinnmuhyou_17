@@ -26,3 +26,5 @@ temp_verify/
 back_end/num.id
 back_end/*.exe
 参考/*
+.coverage
+test-results/
