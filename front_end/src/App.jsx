@@ -12,48 +12,80 @@ import ApprovalStatusModal from './components/ApprovalStatusModal';
 
 const API_URL = '/api';
 
+/**
+ * アプリケーションのメインコンポーネント。
+ *
+ * ログイン管理、データ取得、状態管理、および主要な画面コンポーネントのルーティング（表示切り替え）を行います。
+ *
+ * @returns {JSX.Element} アプリケーション全体のJSX要素。
+ */
 function App() {
-  const [user, setUser] = useState(null); // ログインユーザー情報
+  // --- State Definitions ---
 
+  /** ログインユーザー情報 */
+  const [user, setUser] = useState(null);
+
+  /** 社員リスト */
   const [employees, setEmployees] = useState([]);
+  /** 会社リスト */
   const [companies, setCompanies] = useState([]);
 
-  // 初期値はログイン後に設定されるべきだが、初期レンダリングのためにとりあえず1にしておく
-  // 実際にはログインユーザーのIDで上書きされる
+  /**
+   * 現在選択されている社員ID。
+   * 初期値は1だが、ログイン後にログインユーザーのIDで更新される。
+   */
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(1);
+  /** 現在表示している年月 */
   const [currentDate, setCurrentDate] = useState(new Date());
 
+  /** 作業記録データの配列 */
   const [workRecords, setWorkRecords] = useState([]);
+  /** 祝日データ (日付文字列 -> 祝日名) */
   const [holidays, setHolidays] = useState({});
+  /** 特記事項 */
   const [specialNotes, setSpecialNotes] = useState("");
-  // 古いapprovalDate互換だが、新しいステータスも管理する
+
+  // --- 承認ステータス関連 ---
+  /** 承認日 (後方互換用) */
   const [approvalDate, setApprovalDate] = useState(null);
+  /** レポートステータス ('draft', 'submitted', 'approved', 'remanded', 'finalized') */
   const [status, setStatus] = useState('draft');
+  /** 提出日 */
   const [submittedDate, setSubmittedDate] = useState(null);
+  /** 部長承認日 */
   const [managerApprovalDate, setManagerApprovalDate] = useState(null);
+  /** 経理承認日 */
   const [accountingApprovalDate, setAccountingApprovalDate] = useState(null);
+  /** 差し戻し理由 */
   const [remandReason, setRemandReason] = useState(null);
 
+  /** 月次集計データ (出勤日数、欠勤日数など) */
   const [monthlySummary, setMonthlySummary] = useState(null);
+  /** プロジェクト別集計データ */
   const [projectSummary, setProjectSummary] = useState([]);
 
+  // --- 変更検知用State (保存ボタンの活性化などに使用) ---
   const [initialWorkRecords, setInitialWorkRecords] = useState([]);
   const [initialSpecialNotes, setInitialSpecialNotes] = useState("");
   const [initialMonthlySummary, setInitialMonthlySummary] = useState(null);
-  // ステータス関連の初期値
   const [initialStatus, setInitialStatus] = useState('draft');
 
+  /** 画面上のデータが未保存かどうか */
   const [isReportScreenDirty, setIsReportScreenDirty] = useState(false);
+  /** 日報が更新されたかどうか */
   const [hasDailyReportBeenUpdated, setHasDailyReportBeenUpdated] = useState(false);
 
+  // --- UI State ---
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // --- Modals State ---
   const [isDailyReportModalOpen, setDailyReportModalOpen] = useState(false);
   const [isMasterModalOpen, setMasterModalOpen] = useState(false);
   const [isDailyReportListModalOpen, setDailyReportListModalOpen] = useState(false);
   const [isApprovalStatusModalOpen, setApprovalStatusModalOpen] = useState(false);
 
-  // マスタ認証状態 (既存のMasterModal用だが、ログインユーザーのRoleチェックに移行していく)
+  /** マスタメンテナンスの認証状態 */
   const [masterAuthState, setMasterAuthState] = useState({
     isAuthenticated: false,
     isOwner: false,
@@ -62,14 +94,22 @@ function App() {
     timestamp: null,
   });
 
+  /** 日報モーダルで表示する日付 */
   const [selectedDateForDailyReport, setSelectedDateForDailyReport] = useState(null);
+
+  /** 印刷用コンポーネントへのRef */
   const printComponentRef = useRef();
+
+  // --- Effects ---
 
   useEffect(() => {
     console.log("App mounted");
   }, []);
 
-  // ログイン状態確認
+  /**
+   * ログイン状態をチェックするEffect。
+   * マウント時に実行され、セッションが有効ならユーザー情報をセットします。
+   */
   useEffect(() => {
     const checkLogin = async () => {
       try {
@@ -91,7 +131,9 @@ function App() {
     checkLogin();
   }, []);
 
-  // ログイン後のデータフェッチ
+  /**
+   * ログイン後、初期データ（社員リスト、会社情報）を取得するEffect。
+   */
   useEffect(() => {
     if (!user) return; // ログインしていない場合はロードしない
 
@@ -114,7 +156,10 @@ function App() {
     fetchInitialData();
   }, [user]);
 
-  // 初期日付決定 (ログイン後、かつデータロード後)
+  /**
+   * 初期表示日付を決定するEffect。
+   * 前月のデータが未承認の場合は前月を、そうでなければ当月を表示します。
+   */
   useEffect(() => {
     if (!user) return;
     const determineInitialDate = async () => {
@@ -140,6 +185,9 @@ function App() {
     determineInitialDate();
   }, [user]);
 
+  /**
+   * 選択された社員と年月基づいて、作業記録データをサーバーから取得します。
+   */
   const fetchWorkData = useCallback(async () => {
     if (!user || !selectedEmployeeId) return;
 
@@ -218,6 +266,10 @@ function App() {
     fetchWorkData();
   }, [fetchWorkData]);
 
+  /**
+   * 変更状態（dirty state）を計算するEffect。
+   * 現在のデータと初期ロード時のデータを比較し、未保存の変更があるかを判定します。
+   */
   useEffect(() => {
     const isDirty =
       JSON.stringify(workRecords) !== JSON.stringify(initialWorkRecords) ||
@@ -230,21 +282,25 @@ function App() {
   
   // --- Actions ---
 
+  /** ログイン処理 */
   const handleLogin = (userData) => {
     setUser(userData);
     setSelectedEmployeeId(userData.employee_id);
   };
 
+  /** ログアウト処理 */
   const handleLogout = async () => {
     await axios.post('/api/logout');
     setUser(null);
     setEmployees([]);
   };
 
+  /** 社員選択変更処理 */
   const handleEmployeeChange = (e) => {
     setSelectedEmployeeId(parseInt(e.target.value, 10));
   };
 
+  /** データ保存処理 */
   const handleSave = async () => {
     try {
       const year = currentDate.getFullYear();
@@ -273,11 +329,17 @@ function App() {
     }
   };
 
+  /** 印刷ハンドラ */
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
   });
 
-  // ステータス変更系のアクション
+  /**
+   * ステータス（提出、承認など）を変更します。
+   *
+   * @param {string} action - アクションの種類 ('submit', 'approve', 'remand', 'finalize', 'cancel')。
+   * @param {object} additionalData - 追加データ (例: 差し戻し理由)。
+   */
   const updateStatus = async (action, additionalData = {}) => {
     if (isReportScreenDirty) {
       alert('変更が保存されていません。先に保存してください。');
@@ -322,6 +384,7 @@ function App() {
     }
   };
 
+  /** 年月変更処理 */
   const handleChangeDate = (newDate) => {
     if (isReportScreenDirty) {
       if (window.confirm('変更が保存されていません。移動してもよろしいですか？')) {
@@ -332,26 +395,31 @@ function App() {
     }
   };
 
+  /** 月次集計データの変更処理 */
   const handleMonthlySummaryChange = (field, value) => {
     setMonthlySummary(prev => ({ ...prev, [field]: value }));
   };
 
+  /** 日報モーダルを開く処理 */
   const handleOpenDailyReport = (date) => {
     setSelectedDateForDailyReport(date);
     setDailyReportModalOpen(true);
   };
   
+  /** マスター更新後のコールバック */
   const handleMasterUpdate = (updatedEmployees) => {
     // 自分がManager/Accountingなら更新されたリストをセット
     // サーバーから再取得したほうが確実かも
     setEmployees(updatedEmployees);
   };
 
+  /** マスター画面で社員を選択したときの処理 */
   const handleEmployeeSelectInMaster = (employeeId) => {
     setSelectedEmployeeId(employeeId);
     setMasterModalOpen(false);
   };
 
+  /** マスター画面を開く処理 */
   const handleOpenMaster = () => {
     // マスター権限チェック
     if (user.role !== 'manager' && user.role !== 'accounting') {

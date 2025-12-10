@@ -24,6 +24,9 @@ const modalStyles = {
 
 /**
  * 指定された年月の全日報を一覧表示するモーダルコンポーネント。
+ * 日報の内容（作業内容、問題点、課題など）と作業時間を一覧表形式で表示します。
+ * 印刷機能も提供します。
+ *
  * @param {object} props - コンポーネントのプロパティ。
  * @param {boolean} props.isOpen - モーダルが開いているかどうか。
  * @param {Function} props.onRequestClose - モーダルを閉じるための関数。
@@ -43,6 +46,7 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
 
   /**
    * 印刷ダイアログをトリガーする関数。
+   * ReactToPrintを使用して、不可視の`DailyReportListPrint`コンポーネントを印刷します。
    */
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
@@ -114,6 +118,8 @@ const DailyReportListModal = ({ isOpen, onRequestClose, employeeId, year, month 
 
   /**
    * レポートデータに基づいてテーブル行のCSSクラス名を返します。
+   * 土日祝日には色付けを行います。
+   *
    * @param {object} report - 表示するレポートオブジェクト。
    * @returns {string} Tailwind CSSのクラス名。
    */
