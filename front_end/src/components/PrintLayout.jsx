@@ -17,11 +17,14 @@ import { getDaysInMonth, getDay, format } from 'date-fns';
  * @param {object} props.monthlySummary - 月次集計データ。
  * @param {Array<object>} props.projectSummary - 請求先・案件別集計データ。
  * @param {string|null} props.approvalDate - 承認日。
+ * @param {string|null} props.submittedDate - 提出日。
+ * @param {string|null} props.managerApprovalDate - 部長承認日。
+ * @param {string|null} props.accountingApprovalDate - 経理承認日。
  * @param {React.Ref} ref - `react-to-print`が印刷対象を識別するためのref。
  * @returns {JSX.Element} 印刷用のレイアウトを持つJSX要素。
  */
 const PrintLayout = React.forwardRef((props, ref) => {
-  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, projectSummary, approvalDate } = props;
+  const { employee, company, currentDate, workRecords, holidays, specialNotes, monthlySummary, projectSummary, approvalDate, submittedDate, managerApprovalDate, accountingApprovalDate } = props;
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -87,18 +90,33 @@ const PrintLayout = React.forwardRef((props, ref) => {
           <p>部署  ：{employee?.department_name}</p>
           <p>氏名  ：{employee?.employee_name}</p>
         </div>
-        <div className="flex" style={{ marginRight: '20px' }}>
-          <div className="flex flex-col text-center border border-black" style={{ width: '70px', height: '70px' }}>
-            <div className="border-b border-black h-1/4 flex items-center justify-center text-xs">承認</div>
-            <div className="flex-grow flex items-center justify-center text-red-500 text-xs">
-              {approvalDate ? (
-                <div>
-                  <p>{employee?.employee_name?.split(' ')[0] || ''}</p>
-                  <p>{format(new Date(approvalDate), 'M/d')}</p>
+        <div className="flex border border-black h-16">
+          <div className="w-16 border-r border-black flex flex-col">
+            <div className="text-xs text-center border-b border-black bg-gray-100">担当</div>
+            <div className="flex-grow flex items-center justify-center text-xs">
+              {submittedDate ? '済' : ''}
+            </div>
+          </div>
+          <div className="w-16 border-r border-black flex flex-col">
+            <div className="text-xs text-center border-b border-black bg-gray-100">部長</div>
+            <div className="flex-grow flex items-center justify-center text-xs text-red-500">
+              {managerApprovalDate ? (
+                <div className="text-center leading-tight">
+                  <div>承認</div>
+                  <div className="text-[9px]">{managerApprovalDate.slice(5)}</div>
                 </div>
-              ) : (
-                <div style={{ width: '40px', height: '40px' }}></div>
-              )}
+              ) : ''}
+            </div>
+          </div>
+          <div className="w-16 flex flex-col">
+            <div className="text-xs text-center border-b border-black bg-gray-100">経理</div>
+            <div className="flex-grow flex items-center justify-center text-xs text-red-500">
+              {accountingApprovalDate ? (
+                <div className="text-center leading-tight">
+                  <div>完了</div>
+                  <div className="text-[9px]">{accountingApprovalDate.slice(5)}</div>
+                </div>
+              ) : ''}
             </div>
           </div>
         </div>
@@ -146,7 +164,21 @@ const PrintLayout = React.forwardRef((props, ref) => {
             <tr style={{ height: '28px' }}>
                 <td className="border border-black p-1 text-center font-bold" colSpan="2">合計</td>
                 <td className="border border-black p-1 text-center font-bold">{minutesToTime(totalWorkTimeMinutes)}</td>
-                <td className="border border-black p-1"></td>
+                <td className="border border-black p-1 text-xs text-right align-middle">
+                  {monthlySummary && (
+                    <div className="flex justify-end space-x-3">
+                      <span>所定内: {monthlySummary.total_scheduled_work || '0:00'}</span>
+                      <span>法定外残業: {monthlySummary.total_statutory_outer_overtime || '0:00'}</span>
+                      <span className="text-red-600">休日労働: {monthlySummary.total_holiday_work || '0:00'}</span>
+                      <span className="text-green-600">深夜労働: {
+                        minutesToTime(
+                          timeToMinutes(monthlySummary.total_late_night_work) +
+                          timeToMinutes(monthlySummary.total_late_night_holiday_work)
+                        ) || '0:00'
+                      }</span>
+                    </div>
+                  )}
+                </td>
             </tr>
         </tfoot>
       </table>

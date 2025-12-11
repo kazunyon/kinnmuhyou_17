@@ -564,6 +564,9 @@ function App() {
           monthlySummary={monthlySummary}
           projectSummary={projectSummary}
           approvalDate={approvalDate}
+          submittedDate={submittedDate}
+          managerApprovalDate={managerApprovalDate}
+          accountingApprovalDate={accountingApprovalDate}
         />
       </div>
     </div>
