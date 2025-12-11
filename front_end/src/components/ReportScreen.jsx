@@ -312,7 +312,13 @@ const ReportScreen = ({
                 <tr key={index} className="hover:bg-gray-50">
                   <td className="border border-gray-300 p-1 text-left">{item.client_name}</td>
                   <td className="border border-gray-300 p-1 text-left">{item.project_name}</td>
-                  <td className="border border-gray-300 p-1 text-right">{item.total_hours}h</td>
+                  <td className="border border-gray-300 p-1 text-right">
+                    {item.total_minutes !== item.total_raw_minutes ? (
+                        <span>{item.total_hours}h (詳細計: {item.total_raw_hours}h)</span>
+                    ) : (
+                        <span>{item.total_hours}h</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

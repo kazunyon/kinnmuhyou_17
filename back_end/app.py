@@ -608,6 +608,7 @@ def get_work_records(employee_id, year, month):
 
         # プロジェクト集計 (既存ロジック)
         project_summary_map = {}
+        project_raw_summary_map = {}  # B時間集計用
         for record in records_for_display:
              if 'details' in record and record['details']:
                 details_total_minutes = sum(d.get('work_time', 0) for d in record['details'])
@@ -633,6 +634,9 @@ def get_work_records(employee_id, year, month):
                         key = (detail['client_name'], detail['project_name'])
                         if key not in project_summary_map: project_summary_map[key] = 0.0
                         project_summary_map[key] += float(work_records_minutes) / len(record['details'])
+
+                        # raw mapにも0で初期化しておく(念のため)
+                        if key not in project_raw_summary_map: project_raw_summary_map[key] = 0
                      continue
 
                 for detail in record['details']:
@@ -640,15 +644,26 @@ def get_work_records(employee_id, year, month):
                     if key not in project_summary_map: project_summary_map[key] = 0.0
                     project_summary_map[key] += detail.get('work_time', 0) * ratio
 
+                    # B時間の集計 (単純合計)
+                    if key not in project_raw_summary_map: project_raw_summary_map[key] = 0
+                    project_raw_summary_map[key] += detail.get('work_time', 0)
+
         project_summary = []
         for (client_name, project_name), total_minutes in project_summary_map.items():
             hours = total_minutes / 60.0
             truncated_hours = math.floor(hours * 100) / 100.0
+
+            raw_minutes = project_raw_summary_map.get((client_name, project_name), 0)
+            raw_hours = raw_minutes / 60.0
+            truncated_raw_hours = math.floor(raw_hours * 100) / 100.0
+
             project_summary.append({
                 "client_name": client_name,
                 "project_name": project_name,
                 "total_hours": f"{truncated_hours:.2f}",
-                "total_minutes": round(total_minutes)
+                "total_minutes": round(total_minutes),
+                "total_raw_hours": f"{truncated_raw_hours:.2f}",
+                "total_raw_minutes": raw_minutes
             })
         # 取引先名 > 案件名 の順で昇順ソート
         project_summary.sort(key=lambda x: (str(x['client_name']), str(x['project_name'])))
