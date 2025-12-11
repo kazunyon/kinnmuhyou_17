@@ -171,12 +171,17 @@ const DailyReportModal = ({ isOpen, onRequestClose, employeeId, employeeName, da
   };
 
   const handleDetailChange = (index, field, value) => {
-    const newDetails = [...details];
-    // 取引先変更時は案件をリセット
-    if (field === 'client_id') {
-        newDetails[index].project_id = '';
-    }
-    newDetails[index][field] = value;
+    const newDetails = details.map((detail, i) => {
+      if (i === index) {
+        const newDetail = { ...detail, [field]: value };
+        // 取引先変更時は案件をリセット
+        if (field === 'client_id') {
+          newDetail.project_id = '';
+        }
+        return newDetail;
+      }
+      return detail;
+    });
     setDetails(newDetails);
   };
 
