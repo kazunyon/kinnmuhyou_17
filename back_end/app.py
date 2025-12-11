@@ -21,7 +21,7 @@ app = Flask(__name__, static_folder='../front_end/dist')
 CORS(app, supports_credentials=True) # クッキーを含むリクエストを許可
 
 # セッション用のシークレットキー (本番環境では環境変数などから読み込むべき)
-app.secret_key = 'dev_secret_key_change_in_production'
+app.secret_key = os.environ.get('SECRET_KEY', 'dev_secret_key_change_in_production')
 
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 
