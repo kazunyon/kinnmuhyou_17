@@ -152,8 +152,13 @@ const ReportTable = ({ currentDate, workRecords, holidays, monthlySummary, onWor
             const actualWorkMinutes = Math.max(0, workMinutes - breakMinutes); // ⑤作業時間
 
             // 明細合計時間の計算 (ディテールとの整合性チェック用)
-            const detailsTotalMinutes = (record.details || []).reduce((sum, d) => sum + (d.work_time || 0), 0);
-            const isTimeMismatch = actualWorkMinutes !== detailsTotalMinutes;
+            const details = record.details || [];
+            const detailsTotalMinutes = details.reduce((sum, d) => sum + (d.work_time || 0), 0);
+
+            // 明細（取引先）が1件以上ある場合のみ、時間の不整合をチェックする
+            // 0件の場合は、作業時間が入力されていても不整合の強調表示は行わない
+            const hasDetails = details.length > 0;
+            const isTimeMismatch = hasDetails && (actualWorkMinutes !== detailsTotalMinutes);
 
             // 行のCSSクラスを動的に決定
             const rowClass =
